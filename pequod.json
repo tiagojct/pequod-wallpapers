@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Pequod",
+  "version": "0.2.0-alpha",
+  "description": "A pigment-inspired palette for reading and code, rooted in Moby-Dick. Warm paper on one end, deep ink on the other, with eight accent hues named after the crew of the Pequod.",
+  "author": "Tiago Jacinto",
+  "homepage": "https://tiagojct.eu/projects/pequod/",
+  "license": {
+    "palette": "CC-BY-4.0",
+    "code": "MIT"
+  },
+
+  "log": {
+    "50":  "#F7F3EE",
+    "100": "#EAE1D7",
+    "150": "#DBC9B6",
+    "200": "#CFAD8E",
+    "300": "#BD8C68",
+    "400": "#A16E50",
+    "500": "#835A49",
+    "600": "#335260",
+    "700": "#163F54",
+    "800": "#0D2F42",
+    "900": "#0C222F",
+    "950": "#0B1720"
+  },
+
+  "accents": {
+    "ahab":    { "light": "#A83732", "dark": "#E3877C", "role": "red",    "note": "Obsession, fire, the wound." },
+    "starbuck":{ "light": "#0082B1", "dark": "#A6DFFF", "role": "blue",   "note": "The steady mate; sea and storm." },
+    "queequeg":{ "light": "#253E82", "dark": "#838CCF", "role": "indigo", "note": "Tattoo ink; loyalty and strangeness." },
+    "pip":     { "light": "#6A4A00", "dark": "#DEC577", "role": "yellow", "note": "Child of the sun; the lost soul." },
+    "ishmael": { "light": "#76716B", "dark": "#BFBBB6", "role": "grey",   "note": "The narrator; observer, transparent." },
+    "stubb":   { "light": "#CA6435", "dark": "#FFD9BB", "role": "orange", "note": "The pipe-smoking second mate; amber and flame." },
+    "tashtego":{ "light": "#177C55", "dark": "#82C4A2", "role": "green",  "note": "Gay Head harpooneer; woods and moss." },
+    "daggoo":  { "light": "#552823", "dark": "#A17069", "role": "brown",  "note": "African-born harpooneer; earth and mahogany." }
+  },
+
+  "roles": {
+    "light": {
+      "bg":               "log.100",
+      "bg-alt":           "log.50",
+      "surface":          "log.150",
+      "text":             "log.800",
+      "text-muted":       "log.600",
+      "text-subtle":      "log.500",
+      "border":           "log.200",
+      "accent-primary":   "log.700",
+      "accent-secondary": "log.400",
+      "link":             "log.700",
+      "link-hover":       "log.400",
+      "focus-ring":       "log.400"
+    },
+    "dark": {
+      "bg":               "log.950",
+      "bg-alt":           "log.900",
+      "surface":          "log.800",
+      "text":             "log.100",
+      "text-muted":       "log.300",
+      "text-subtle":      "log.400",
+      "border":           "log.700",
+      "accent-primary":   "log.300",
+      "accent-secondary": "log.400",
+      "link":             "log.300",
+      "link-hover":       "log.400",
+      "focus-ring":       "log.300"
+    }
+  },
+
+  "syntax": {
+    "keyword":   "ahab",
+    "string":    "tashtego",
+    "number":    "pip",
+    "comment":   "ishmael",
+    "function":  "starbuck",
+    "type":      "queequeg",
+    "constant":  "stubb",
+    "variable":  "daggoo",
+    "operator":  "ishmael",
+    "punctuation": "ishmael"
+  }
+}

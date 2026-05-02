@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pequod-wallpapers</title>
+    <meta name="description" content="A wallpaper generator built on the Pequod palette. Two modes (abstract, maritime), two themes (light, dark), seed-reproducible output, PNG and SVG export." />
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-theme="light">
+    <header class="topbar">
+      <h1>pequod-wallpapers</h1>
+      <p class="tagline">a wallpaper generator built on the Pequod palette</p>
+    </header>
+
+    <main class="layout">
+      <aside class="controls" aria-label="generation controls">
+        <div class="control">
+          <label for="mode">mode</label>
+          <select id="mode">
+            <option value="abstract">abstract</option>
+            <option value="maritime">maritime</option>
+          </select>
+        </div>
+
+        <div class="control">
+          <label for="theme">theme</label>
+          <select id="theme">
+            <option value="light">light</option>
+            <option value="dark">dark</option>
+          </select>
+        </div>
+
+        <div class="control">
+          <label for="aspect">aspect ratio</label>
+          <select id="aspect">
+            <option value="16x10">16:10</option>
+            <option value="16x9">16:9</option>
+            <option value="21x9">21:9</option>
+            <option value="4x3">4:3</option>
+            <option value="19x9">19.5:9</option>
+            <option value="1x1">1:1</option>
+            <option value="custom">custom</option>
+          </select>
+          <div id="custom-aspect" class="custom-aspect" hidden>
+            <input id="custom-w" type="number" min="1" max="16384" value="16" aria-label="custom width" />
+            <span aria-hidden="true">x</span>
+            <input id="custom-h" type="number" min="1" max="16384" value="10" aria-label="custom height" />
+          </div>
+        </div>
+
+        <button id="more-toggle" class="link-btn" aria-expanded="false">more</button>
+
+        <div id="advanced" class="advanced" hidden>
+          <div class="control">
+            <label for="density">density</label>
+            <select id="density">
+              <option value="low">low</option>
+              <option value="medium" selected>medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+
+          <div class="control">
+            <label for="count">accent count</label>
+            <select id="count">
+              <option value="1">1</option>
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+            </select>
+          </div>
+
+          <fieldset class="control">
+            <legend>accent lock (optional)</legend>
+            <div id="accent-lock" class="accent-lock"></div>
+          </fieldset>
+
+          <div class="control">
+            <label for="seed">seed</label>
+            <input id="seed" type="text" spellcheck="false" autocomplete="off" />
+          </div>
+
+          <div class="control">
+            <label class="checkbox-row">
+              <input id="watermark" type="checkbox" />
+              <span>watermark</span>
+            </label>
+          </div>
+        </div>
+      </aside>
+
+      <section class="preview" aria-label="wallpaper preview">
+        <div id="stage" class="stage" role="img" aria-label="current wallpaper"></div>
+      </section>
+    </main>
+
+    <footer class="actions" aria-label="actions">
+      <div class="left">
+        <button id="regenerate" class="primary" aria-label="generate a new wallpaper">regenerate</button>
+        <span id="status" class="status" aria-live="polite"></span>
+      </div>
+      <div class="right">
+        <button id="copy-seed">copy seed</button>
+        <button id="copy-url">copy share url</button>
+        <button id="export-png">export png</button>
+        <button id="export-svg">export svg</button>
+        <button id="save">save</button>
+        <button id="gallery">gallery</button>
+      </div>
+    </footer>
+
+    <div id="gallery-drawer" class="gallery-drawer" hidden>
+      <div class="gallery-bar">
+        <h2>gallery</h2>
+        <span id="gallery-count" class="muted"></span>
+        <div class="spacer"></div>
+        <button id="export-gallery">export json</button>
+        <button id="close-gallery" aria-label="close gallery">close</button>
+      </div>
+      <div id="gallery-grid" class="gallery-grid"></div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

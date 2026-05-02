@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- 8-point compass rose, slightly weathered (asymmetric points). Placeholder. -->
+  <!-- North (long) -->
+  <path d="M 50 6 L 54 50 L 50 42 L 46 50 Z" />
+  <!-- South (slightly shorter) -->
+  <path d="M 50 94 L 46 50 L 50 58 L 54 50 Z" />
+  <!-- East (medium) -->
+  <path d="M 92 50 L 50 54 L 58 50 L 50 46 Z" />
+  <!-- West (medium, asymmetric) -->
+  <path d="M 8 50 L 50 46 L 42 50 L 50 54 Z" />
+  <!-- NE (short) -->
+  <path d="M 78 22 L 54 46 L 56 48 Z" />
+  <!-- SE -->
+  <path d="M 80 80 L 54 54 L 52 56 Z" />
+  <!-- SW -->
+  <path d="M 22 80 L 46 54 L 44 52 Z" />
+  <!-- NW -->
+  <path d="M 22 22 L 46 46 L 44 48 Z" />
+  <!-- Centre disc -->
+  <circle cx="50" cy="50" r="3" />
+</svg>

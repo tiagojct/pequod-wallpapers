@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Sperm whale silhouette, side view (placeholder). Distinctive blocky head. -->
+  <!-- Body and head as a single path -->
+  <path d="M 6 56
+           L 6 42
+           Q 6 36 12 36
+           L 36 36
+           Q 50 36 60 42
+           Q 76 50 88 50
+           L 92 50
+           Q 96 52 92 58
+           L 86 60
+           Q 78 62 70 60
+           Q 60 60 52 64
+           Q 38 70 22 68
+           Q 10 66 6 56 Z" />
+  <!-- Flukes -->
+  <path d="M 4 48 L 14 40 L 12 50 L 14 60 L 4 54 Z" />
+  <!-- Eye -->
+  <circle cx="20" cy="50" r="0.9" fill="#ffffff" fill-opacity="0.5" />
+</svg>

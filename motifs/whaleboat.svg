@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Whaleboat with mast and harpoon (placeholder). -->
+  <!-- Hull -->
+  <path d="M 14 60 Q 50 72 86 60 L 80 70 Q 50 76 20 70 Z" />
+  <!-- Mast -->
+  <rect x="49" y="22" width="2" height="38" />
+  <!-- Sail (small) -->
+  <path d="M 51 26 L 64 30 L 64 50 L 51 54 Z" />
+  <!-- Harpoon resting along the gunwale -->
+  <path d="M 22 58 L 78 56 L 78 58 L 22 60 Z" />
+  <!-- Harpoon head -->
+  <path d="M 78 56 L 84 53 L 86 56 L 84 59 L 78 60 Z" />
+</svg>
