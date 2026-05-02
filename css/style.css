@@ -62,6 +62,11 @@
 
 * { box-sizing: border-box; }
 
+/* The HTML `hidden` attribute defaults to display:none, but our
+   .gallery-drawer and .custom-aspect rules set display:flex/grid,
+   which wins over the UA default. Force [hidden] to win back. */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   margin: 0;
