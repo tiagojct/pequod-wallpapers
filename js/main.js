@@ -5,7 +5,7 @@ import { loadPalette } from "./palette.js";
 import { loadAllMotifs } from "./motifs.js";
 import { composeAbstract } from "./compose-abstract.js";
 import { composeMaritime } from "./compose-maritime.js";
-import { buildSVG } from "./render.js";
+import { buildSVG, viewportFor } from "./render.js";
 import { exportPNG, exportSVG, makeFilename, thumbnailDataURL } from "./export.js";
 import { saveEntry, listEntries, deleteEntry, exportGalleryJSON } from "./gallery.js";
 import {
@@ -77,6 +77,7 @@ function buildAccentLockUI() {
   container.innerHTML = "";
   for (const name of ALL_ACCENTS) {
     const id = `lock-${name}`;
+    const a = palette.accents[name];
     const wrap = document.createElement("label");
     wrap.className = "accent-chip";
     wrap.htmlFor = id;
@@ -90,9 +91,15 @@ function buildAccentLockUI() {
       ).map((el) => el.value);
       state.accents = checked;
     });
+    // Half-and-half swatch showing both the light and dark variants.
+    const dot = document.createElement("span");
+    dot.className = "accent-dot";
+    dot.style.background = `linear-gradient(90deg, ${a.light} 0 50%, ${a.dark} 50% 100%)`;
+    dot.title = `${name}: ${a.light} (light), ${a.dark} (dark)`;
     const span = document.createElement("span");
     span.textContent = name;
     wrap.appendChild(cb);
+    wrap.appendChild(dot);
     wrap.appendChild(span);
     container.appendChild(wrap);
   }
@@ -256,10 +263,11 @@ function matchAspect(w, h) {
 function regenerate({ keepSeed = false, replaceURL = false } = {}) {
   if (!keepSeed) state.seed = newSeed();
   const rng = makeRng(state.seed);
+  const vp = viewportFor(state.aspectW, state.aspectH);
   const composition =
     state.mode === "abstract"
-      ? composeAbstract(palette, rng, state)
-      : composeMaritime(palette, rng, state);
+      ? composeAbstract(palette, rng, state, vp)
+      : composeMaritime(palette, rng, state, vp);
   lastComposition = composition;
   rerender();
   document.getElementById("seed").value = state.seed;

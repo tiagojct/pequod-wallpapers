@@ -1,30 +1,27 @@
-// Builds an SVG element from a composition descriptor. The SVG uses a
-// 1000x1000 viewBox so layouts are aspect-independent; the outer width
-// and height map to the chosen aspect ratio.
+// Builds an SVG element from a composition descriptor. The composition
+// uses the viewport dimensions directly (long axis = 1000, short axis
+// scaled to aspect), so no letterboxing or cropping is needed.
 
 import { cloneMotif } from "./motifs.js";
 import { rgba } from "./palette.js";
 
+export function viewportFor(aspectW, aspectH) {
+  // Long axis = 1000; short axis scaled to aspect.
+  if (aspectW >= aspectH) {
+    return { w: 1000, h: (1000 * aspectH) / aspectW };
+  }
+  return { w: (1000 * aspectW) / aspectH, h: 1000 };
+}
+
 export function buildSVG(composition, options) {
   const { aspectW, aspectH, watermark, seed, motifsCache } = options;
   const NS = "http://www.w3.org/2000/svg";
-
-  // Compute virtual viewBox that matches the aspect.
-  // Internal coordinates are 0..1000 on the long axis; the short axis
-  // is scaled to maintain the aspect.
-  let vbW, vbH;
-  if (aspectW >= aspectH) {
-    vbW = 1000;
-    vbH = (1000 * aspectH) / aspectW;
-  } else {
-    vbH = 1000;
-    vbW = (1000 * aspectW) / aspectH;
-  }
+  const { w: vbW, h: vbH } = viewportFor(aspectW, aspectH);
 
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("xmlns", NS);
   svg.setAttribute("viewBox", `0 0 ${vbW} ${vbH}`);
-  svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
   // Surface background.
   const bg = document.createElementNS(NS, "rect");
@@ -49,13 +46,7 @@ export function buildSVG(composition, options) {
   defs.appendChild(feather);
   svg.appendChild(defs);
 
-  // Position composition shapes inside the visible area. Composition
-  // assumes a 1000x1000 layout space; we letterbox by centring it
-  // inside the 1000x(actual height) viewBox.
-  const offsetX = (vbW - 1000) / 2;
-  const offsetY = (vbH - 1000) / 2;
   const shapeGroup = document.createElementNS(NS, "g");
-  shapeGroup.setAttribute("transform", `translate(${offsetX}, ${offsetY})`);
   svg.appendChild(shapeGroup);
 
   for (const s of composition.shapes || []) {
@@ -65,9 +56,12 @@ export function buildSVG(composition, options) {
   for (const m of composition.motifs || []) {
     if (!motifsCache[m.name]) continue;
     const node = cloneMotif(motifsCache[m.name], m.fill);
+    // Nested SVG without explicit width/height defaults to 100% of the
+    // outer viewport. Lock it to the motif's intrinsic 100x100 box so
+    // the surrounding scale() places the motif at the requested size.
+    node.setAttribute("width", "100");
+    node.setAttribute("height", "100");
     const wrap = document.createElementNS(NS, "g");
-    const cx = m.x + m.size / 2;
-    const cy = m.y + m.size / 2;
     wrap.setAttribute(
       "transform",
       `translate(${m.x}, ${m.y}) scale(${m.size / 100}) ` +

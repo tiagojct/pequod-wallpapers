@@ -1,14 +1,14 @@
 // Maritime mode composition.
 // Sub-styles: horizon, isolated-motif, scattered-fleet.
-// Output is a list of shape descriptors plus motif placements with
-// motif name, position, scale, rotation, and fill.
+// Coordinates use the actual viewport (vp.w x vp.h) so layouts fill any
+// aspect ratio without cropping or letterboxing.
 
 import { pickSurface, pickForegroundLogs, pickAccents, crewHex } from "./palette.js";
 import { MOTIF_NAMES } from "./motifs.js";
 
 const SUBSTYLES = ["horizon", "isolated-motif", "scattered-fleet"];
 
-export function composeMaritime(p, rng, state) {
+export function composeMaritime(p, rng, state, vp) {
   const substyle = rng.pick(SUBSTYLES);
   const surface = pickSurface(p, rng, state.theme);
   const accents = pickAccents(rng, state.accentCount, state.accents);
@@ -23,7 +23,7 @@ export function composeMaritime(p, rng, state) {
     })),
   };
 
-  const layout = renderSubstyle(rng, state, substyle, palette);
+  const layout = renderSubstyle(rng, state, substyle, palette, vp);
 
   return {
     substyle,
@@ -34,29 +34,27 @@ export function composeMaritime(p, rng, state) {
   };
 }
 
-function renderSubstyle(rng, state, substyle, palette) {
+function renderSubstyle(rng, state, substyle, palette, vp) {
   switch (substyle) {
     case "horizon":
-      return renderHorizon(rng, state, palette);
+      return renderHorizon(rng, state, palette, vp);
     case "isolated-motif":
-      return renderIsolatedMotif(rng, state, palette);
+      return renderIsolatedMotif(rng, state, palette, vp);
     case "scattered-fleet":
-      return renderScatteredFleet(rng, state, palette);
+      return renderScatteredFleet(rng, state, palette, vp);
     default:
       return { shapes: [], motifs: [] };
   }
 }
 
-// Horizon: split into sky+sea using two same-temperature Log steps,
-// place a motif on or near the horizon line.
-function renderHorizon(rng, state, palette) {
-  const horizonY = rng.range(380, 640);
+function renderHorizon(rng, state, palette, vp) {
+  const horizonY = rng.range(0.38 * vp.h, 0.64 * vp.h);
   const skyHex = palette.fgLogs[0]?.hex || palette.surface.hex;
   const seaHex = palette.fgLogs[1]?.hex || palette.surface.hex;
 
   const shapes = [
-    { type: "rect", x: 0, y: 0, w: 1000, h: horizonY, fill: skyHex },
-    { type: "rect", x: 0, y: horizonY, w: 1000, h: 1000 - horizonY, fill: seaHex },
+    { type: "rect", x: 0, y: 0, w: vp.w, h: horizonY, fill: skyHex },
+    { type: "rect", x: 0, y: horizonY, w: vp.w, h: vp.h - horizonY, fill: seaHex },
   ];
 
   const motifName = rng.pick([
@@ -68,8 +66,9 @@ function renderHorizon(rng, state, palette) {
   ]);
   const motifFill =
     palette.accents[0]?.hex || palette.fgLogs[0]?.hex || palette.surface.hex;
-  const motifSize = rng.range(120, 220);
-  const motifX = rng.range(200, 800) - motifSize / 2;
+  const minDim = Math.min(vp.w, vp.h);
+  const motifSize = rng.range(0.12 * minDim, 0.22 * minDim);
+  const motifX = rng.range(0.2 * vp.w, 0.8 * vp.w) - motifSize / 2;
   let motifY;
   if (motifName === "sun-moon") {
     motifY = horizonY - motifSize * 0.7;
@@ -92,15 +91,14 @@ function renderHorizon(rng, state, palette) {
   return { shapes, motifs };
 }
 
-// Isolated motif: single large silhouette, monochromatic.
-function renderIsolatedMotif(rng, state, palette) {
+function renderIsolatedMotif(rng, state, palette, vp) {
   const motifName = rng.pick(MOTIF_NAMES);
   const motifFill =
     palette.accents[0]?.hex || palette.fgLogs[0]?.hex;
-  const size = rng.range(420, 640);
-  // Rule-of-thirds horizontal positioning.
-  const xCentre = rng.pick([330, 500, 670]);
-  const yCentre = rng.pick([400, 500, 600]);
+  const minDim = Math.min(vp.w, vp.h);
+  const size = rng.range(0.42 * minDim, 0.64 * minDim);
+  const xCentre = rng.pick([0.33, 0.5, 0.67]) * vp.w;
+  const yCentre = rng.pick([0.4, 0.5, 0.6]) * vp.h;
   const x = xCentre - size / 2;
   const y = yCentre - size / 2;
   const rotate = rng.next() > 0.85 ? rng.range(-8, 8) : 0;
@@ -113,19 +111,19 @@ function renderIsolatedMotif(rng, state, palette) {
   };
 }
 
-// Scattered fleet: 3-8 small motifs with varied scale and rotation.
-function renderScatteredFleet(rng, state, palette) {
+function renderScatteredFleet(rng, state, palette, vp) {
   const n = state.density === "low" ? 3 : state.density === "high" ? 8 : 5;
   const fills = [
     ...palette.accents.map((a) => a.hex),
     ...palette.fgLogs.map((s) => s.hex),
   ];
+  const minDim = Math.min(vp.w, vp.h);
   const motifs = [];
   for (let i = 0; i < n; i++) {
     const name = rng.pick(["pequod", "whaleboat", "whale-fluke", "sperm-whale", "compass-rose"]);
-    const size = rng.range(90, 180);
-    const x = rng.range(40, 960) - size / 2;
-    const y = rng.range(60, 940) - size / 2;
+    const size = rng.range(0.09 * minDim, 0.18 * minDim);
+    const x = rng.range(0.04 * vp.w, 0.96 * vp.w) - size / 2;
+    const y = rng.range(0.06 * vp.h, 0.94 * vp.h) - size / 2;
     const rotate = rng.range(-12, 12);
     const fill = rng.pick(fills);
     motifs.push({ name, x, y, size, rotate, fill });

@@ -227,6 +227,20 @@ input[type="text"],
   border-color: var(--primary);
 }
 
+.accent-dot {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .accent-dot {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .preview {
   display: flex;
   align-items: center;

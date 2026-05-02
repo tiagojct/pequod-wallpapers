@@ -1,13 +1,13 @@
 // Abstract mode composition.
 // Sub-styles: bauhaus, risograph, topographic, colour-field, generative-grid.
-// All draws use viewport-relative coordinates inside a virtual 1000x1000
-// box. The renderer then scales to the chosen output dimensions.
+// Coordinates use the actual viewport (vp.w x vp.h) so layouts fill any
+// aspect ratio without cropping or letterboxing.
 
 import { pickSurface, pickForegroundLogs, pickAccents, crewHex, rgba } from "./palette.js";
 
 const SUBSTYLES = ["bauhaus", "risograph", "topographic", "colour-field", "generative-grid"];
 
-export function composeAbstract(p, rng, state) {
+export function composeAbstract(p, rng, state, vp) {
   const substyle = rng.pick(SUBSTYLES);
   const surface = pickSurface(p, rng, state.theme);
   const accents = pickAccents(rng, state.accentCount, state.accents);
@@ -22,7 +22,7 @@ export function composeAbstract(p, rng, state) {
     })),
   };
 
-  const shapes = renderSubstyle(rng, state, substyle, palette);
+  const shapes = renderSubstyle(rng, state, substyle, palette, vp);
 
   return {
     substyle,
@@ -32,18 +32,18 @@ export function composeAbstract(p, rng, state) {
   };
 }
 
-function renderSubstyle(rng, state, substyle, palette) {
+function renderSubstyle(rng, state, substyle, palette, vp) {
   switch (substyle) {
     case "bauhaus":
-      return renderBauhaus(rng, state, palette);
+      return renderBauhaus(rng, state, palette, vp);
     case "risograph":
-      return renderRisograph(rng, state, palette);
+      return renderRisograph(rng, state, palette, vp);
     case "topographic":
-      return renderTopographic(rng, state, palette);
+      return renderTopographic(rng, state, palette, vp);
     case "colour-field":
-      return renderColourField(rng, state, palette);
+      return renderColourField(rng, state, palette, vp);
     case "generative-grid":
-      return renderGenerativeGrid(rng, state, palette);
+      return renderGenerativeGrid(rng, state, palette, vp);
     default:
       return [];
   }
@@ -56,16 +56,17 @@ function densityRange(density, lo, hi) {
 }
 
 // Bauhaus: 3-7 hard-edged primitives, large scale, pure colours.
-function renderBauhaus(rng, state, palette) {
+function renderBauhaus(rng, state, palette, vp) {
   const n = densityRange(state.density, 3, 7);
   const swatches = swatchPool(palette);
+  const minDim = Math.min(vp.w, vp.h);
   const shapes = [];
   for (let i = 0; i < n; i++) {
     const kind = rng.pick(["circle", "rect", "triangle", "line"]);
     const fill = rng.pick(swatches);
-    const x = rng.range(50, 950);
-    const y = rng.range(50, 950);
-    const size = rng.range(120, 400);
+    const x = rng.range(50, vp.w - 50);
+    const y = rng.range(50, vp.h - 50);
+    const size = rng.range(0.12 * minDim, 0.4 * minDim);
     if (kind === "circle") {
       shapes.push({
         type: "circle",
@@ -108,7 +109,7 @@ function renderBauhaus(rng, state, palette) {
         x2: x + dx / 2,
         y2: y + dy / 2,
         stroke: fill,
-        strokeWidth: rng.range(8, 22),
+        strokeWidth: rng.range(0.008 * minDim, 0.022 * minDim),
       });
     }
   }
@@ -116,15 +117,16 @@ function renderBauhaus(rng, state, palette) {
 }
 
 // Risograph: 2-4 translucent layered shapes with multiply blend.
-function renderRisograph(rng, state, palette) {
+function renderRisograph(rng, state, palette, vp) {
   const n = densityRange(state.density, 2, 4);
   const swatches = swatchPool(palette);
+  const minDim = Math.min(vp.w, vp.h);
   const shapes = [];
   for (let i = 0; i < n; i++) {
     const fill = rng.pick(swatches);
-    const x = rng.range(150, 850);
-    const y = rng.range(150, 850);
-    const size = rng.range(350, 700);
+    const x = rng.range(0.15 * vp.w, 0.85 * vp.w);
+    const y = rng.range(0.15 * vp.h, 0.85 * vp.h);
+    const size = rng.range(0.35 * minDim, 0.7 * minDim);
     const kind = rng.pick(["circle", "soft-rect"]);
     if (kind === "circle") {
       shapes.push({
@@ -144,7 +146,7 @@ function renderRisograph(rng, state, palette) {
         h: size * rng.range(0.6, 1.0),
         fill: rgba(fill, 0.5),
         blend: "multiply",
-        rx: rng.range(0, 30),
+        rx: rng.range(0, 0.03 * minDim),
       });
     }
   }
@@ -152,13 +154,14 @@ function renderRisograph(rng, state, palette) {
 }
 
 // Topographic: nested concentric shapes suggesting contour lines.
-function renderTopographic(rng, state, palette) {
+function renderTopographic(rng, state, palette, vp) {
   const layers = densityRange(state.density, 5, 14);
   const swatches = [...palette.fgLogs.map((s) => s.hex), ...palette.accents.map((a) => a.hex)];
-  const cx = rng.range(300, 700);
-  const cy = rng.range(300, 700);
-  const maxR = rng.range(380, 560);
-  const minR = rng.range(40, 90);
+  const minDim = Math.min(vp.w, vp.h);
+  const cx = rng.range(0.3 * vp.w, 0.7 * vp.w);
+  const cy = rng.range(0.3 * vp.h, 0.7 * vp.h);
+  const maxR = rng.range(0.38 * minDim, 0.56 * minDim) * 1.4;
+  const minR = rng.range(0.04 * minDim, 0.09 * minDim);
   const irregular = rng.next() > 0.5;
   const shapes = [];
   for (let i = 0; i < layers; i++) {
@@ -182,22 +185,22 @@ function renderTopographic(rng, state, palette) {
 }
 
 // Colour-field: 2-4 large rectangular blocks, soft borders.
-function renderColourField(rng, state, palette) {
+function renderColourField(rng, state, palette, vp) {
   const n = densityRange(state.density, 2, 4);
   const swatches = [...palette.fgLogs.map((s) => s.hex), ...palette.accents.map((a) => a.hex)];
   const shapes = [];
-  // Vertical or horizontal stack.
   const horizontal = rng.next() > 0.5;
-  let cursor = rng.range(40, 100);
+  const axisLen = horizontal ? vp.h : vp.w;
+  let cursor = rng.range(0.04 * axisLen, 0.1 * axisLen);
   for (let i = 0; i < n; i++) {
     const swatch = rng.pick(swatches);
-    const thickness = rng.range(150, 380);
+    const thickness = rng.range(0.15 * axisLen, 0.38 * axisLen);
     if (horizontal) {
       shapes.push({
         type: "rect",
         x: 0,
         y: cursor,
-        w: 1000,
+        w: vp.w,
         h: thickness,
         fill: swatch,
         feather: 14,
@@ -208,7 +211,7 @@ function renderColourField(rng, state, palette) {
         x: cursor,
         y: 0,
         w: thickness,
-        h: 1000,
+        h: vp.h,
         fill: swatch,
         feather: 14,
       });
@@ -219,18 +222,19 @@ function renderColourField(rng, state, palette) {
 }
 
 // Generative grid: tiled rectangular cells with palette variation.
-function renderGenerativeGrid(rng, state, palette) {
+function renderGenerativeGrid(rng, state, palette, vp) {
   const cells = densityRange(state.density, 6, 14);
-  const cellW = 1000 / cells;
-  const cellH = 1000 / cells;
+  const cellW = vp.w / cells;
+  const cellH = vp.h / cells;
+  const cols = cells;
+  const rows = Math.max(1, Math.round(vp.h / cellH));
   const swatches = [...palette.fgLogs.map((s) => s.hex), ...palette.accents.map((a) => a.hex)];
-  // Include the surface as a "blank" weight so the grid breathes.
   const pool = [...swatches, palette.surface.hex, palette.surface.hex];
   const shapes = [];
-  for (let r = 0; r < cells; r++) {
-    for (let c = 0; c < cells; c++) {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
       const fill = rng.pick(pool);
-      if (fill === palette.surface.hex) continue; // leave blank
+      if (fill === palette.surface.hex) continue;
       shapes.push({
         type: "rect",
         x: c * cellW,
