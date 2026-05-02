@@ -15,6 +15,12 @@ const VALID_ACCENTS = new Set([
   "daggoo",
 ]);
 
+function encodeAspect(w, h) {
+  if (w === 19.5 && h === 9) return "19x9";
+  if (w === 9 && h === 19.5) return "9x19";
+  return `${w}x${h}`;
+}
+
 export const DEFAULT_STATE = {
   mode: "abstract",
   theme: "light",
@@ -39,13 +45,23 @@ export function readStateFromURL() {
 
   const aspect = params.get("aspect");
   if (aspect) {
-    const m = aspect.match(/^(\d+)x(\d+)$/);
-    if (m) {
-      const w = parseInt(m[1], 10);
-      const h = parseInt(m[2], 10);
-      if (w > 0 && h > 0 && w <= 16384 && h <= 16384) {
-        out.aspectW = w;
-        out.aspectH = h;
+    // Recognise the two encoded phone aspects (where 19 stands for 19.5
+    // in the URL slug) before falling back to integer parsing.
+    if (aspect === "19x9") {
+      out.aspectW = 19.5;
+      out.aspectH = 9;
+    } else if (aspect === "9x19") {
+      out.aspectW = 9;
+      out.aspectH = 19.5;
+    } else {
+      const m = aspect.match(/^(\d+)x(\d+)$/);
+      if (m) {
+        const w = parseInt(m[1], 10);
+        const h = parseInt(m[2], 10);
+        if (w > 0 && h > 0 && w <= 16384 && h <= 16384) {
+          out.aspectW = w;
+          out.aspectH = h;
+        }
       }
     }
   }
@@ -81,7 +97,7 @@ export function writeStateToURL(state, replace = false) {
   const p = new URLSearchParams();
   p.set("mode", state.mode);
   p.set("theme", state.theme);
-  p.set("aspect", `${state.aspectW}x${state.aspectH}`);
+  p.set("aspect", encodeAspect(state.aspectW, state.aspectH));
   p.set("density", state.density);
   p.set("count", String(state.accentCount));
   if (state.accents && state.accents.length > 0) {
@@ -102,7 +118,7 @@ export function shareableURL(state) {
   const p = new URLSearchParams();
   p.set("mode", state.mode);
   p.set("theme", state.theme);
-  p.set("aspect", `${state.aspectW}x${state.aspectH}`);
+  p.set("aspect", encodeAspect(state.aspectW, state.aspectH));
   p.set("density", state.density);
   p.set("count", String(state.accentCount));
   if (state.accents && state.accents.length > 0) {

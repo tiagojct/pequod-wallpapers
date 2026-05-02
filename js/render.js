@@ -32,18 +32,24 @@ export function buildSVG(composition, options) {
   bg.setAttribute("fill", composition.surface.hex);
   svg.appendChild(bg);
 
-  // Defs for filters used by colour-field feathering.
+  // Defs for filters and gradients.
   const defs = document.createElementNS(NS, "defs");
+  // Strong feather filter, used by colour-field bands (Rothko soft edges).
   const feather = document.createElementNS(NS, "filter");
   feather.setAttribute("id", "feather");
-  feather.setAttribute("x", "-5%");
-  feather.setAttribute("y", "-5%");
-  feather.setAttribute("width", "110%");
-  feather.setAttribute("height", "110%");
+  feather.setAttribute("x", "-15%");
+  feather.setAttribute("y", "-15%");
+  feather.setAttribute("width", "130%");
+  feather.setAttribute("height", "130%");
   const blur = document.createElementNS(NS, "feGaussianBlur");
-  blur.setAttribute("stdDeviation", "4");
+  blur.setAttribute("stdDeviation", String(Math.max(8, Math.min(vbW, vbH) * 0.024)));
   feather.appendChild(blur);
   defs.appendChild(feather);
+
+  // Gradients defined by the composition.
+  for (const g of composition.gradients || []) {
+    defs.appendChild(buildGradientNode(g, NS));
+  }
   svg.appendChild(defs);
 
   const shapeGroup = document.createElementNS(NS, "g");
@@ -92,6 +98,33 @@ export function buildSVG(composition, options) {
   }
 
   return { svg, vbW, vbH };
+}
+
+function buildGradientNode(g, NS) {
+  let el;
+  if (g.type === "radial") {
+    el = document.createElementNS(NS, "radialGradient");
+    el.setAttribute("id", g.id);
+    el.setAttribute("cx", g.cx);
+    el.setAttribute("cy", g.cy);
+    el.setAttribute("r", g.r);
+    el.setAttribute("gradientUnits", "userSpaceOnUse");
+  } else {
+    el = document.createElementNS(NS, "linearGradient");
+    el.setAttribute("id", g.id);
+    el.setAttribute("x1", g.x1);
+    el.setAttribute("y1", g.y1);
+    el.setAttribute("x2", g.x2);
+    el.setAttribute("y2", g.y2);
+    el.setAttribute("gradientUnits", "userSpaceOnUse");
+  }
+  for (const s of g.stops) {
+    const stop = document.createElementNS(NS, "stop");
+    stop.setAttribute("offset", String(s.offset));
+    stop.setAttribute("stop-color", s.color);
+    el.appendChild(stop);
+  }
+  return el;
 }
 
 function appendShape(parent, s, NS) {

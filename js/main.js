@@ -21,6 +21,7 @@ const ASPECT_PRESETS = {
   "21x9": [21, 9],
   "4x3": [4, 3],
   "19x9": [19.5, 9],
+  "9x19": [9, 19.5],
   "1x1": [1, 1],
 };
 
@@ -255,8 +256,9 @@ function matchAspect(w, h) {
       return key;
     }
   }
-  // Try with floor for the 19.5x9 case which we encode as 19x9.
+  // Encoded edge cases for the 19.5 phone aspects.
   if (w === 19.5 && h === 9) return "19x9";
+  if (w === 9 && h === 19.5) return "9x19";
   return null;
 }
 
