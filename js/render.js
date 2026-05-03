@@ -11,7 +11,6 @@
 //   5. paper-grain wash (turbulence noise, multiply blend, low alpha)
 //   6. vignette (radial gradient overlay, very subtle)
 
-import { cloneMotif } from "./motifs.js";
 import { rgba, cyrb53OrZero } from "./palette.js";
 
 // Long axis = 1000, short axis scaled to aspect.
@@ -135,30 +134,7 @@ export function buildSVG(composition, options) {
   }
   svg.appendChild(shapeGroup);
 
-  // 4. Motif group.
-  if (composition.motifs && composition.motifs.length > 0) {
-    const motifGroup = document.createElementNS(NS, "g");
-    for (const m of composition.motifs) {
-      if (!motifsCache[m.name]) continue;
-      const node = cloneMotif(motifsCache[m.name], m.fill);
-      // Lock nested SVG to its 100x100 box so the surrounding scale()
-      // produces the requested pixel size.
-      node.setAttribute("width", "100");
-      node.setAttribute("height", "100");
-      const wrap = document.createElementNS(NS, "g");
-      wrap.setAttribute(
-        "transform",
-        `translate(${m.x}, ${m.y}) scale(${m.size / 100}) ` +
-          (m.rotate ? `rotate(${m.rotate} 50 50)` : ""),
-      );
-      if (m.shadow) wrap.setAttribute("filter", "url(#motif-shadow)");
-      wrap.appendChild(node);
-      motifGroup.appendChild(wrap);
-    }
-    svg.appendChild(motifGroup);
-  }
-
-  // 5. Paper-grain wash. Multiply blend so the noise modulates without
+  // 4. Paper-grain wash. Multiply blend so the noise modulates without
   // washing out the colour beneath.
   const grainRect = document.createElementNS(NS, "rect");
   grainRect.setAttribute("x", "0");
@@ -170,7 +146,7 @@ export function buildSVG(composition, options) {
   grainRect.setAttribute("style", "mix-blend-mode: multiply");
   svg.appendChild(grainRect);
 
-  // 6. Vignette overlay.
+  // 5. Vignette overlay.
   const vignetteRect = document.createElementNS(NS, "rect");
   vignetteRect.setAttribute("x", "0");
   vignetteRect.setAttribute("y", "0");
@@ -351,6 +327,21 @@ function appendShape(parent, s, NS) {
     el.setAttribute("stroke", s.stroke);
     el.setAttribute("stroke-width", s.strokeWidth);
     el.setAttribute("stroke-linecap", "round");
+  } else if (s.type === "path") {
+    el = document.createElementNS(NS, "path");
+    el.setAttribute("d", s.d);
+    if (s.fill === "none") {
+      el.setAttribute("fill", "none");
+    } else if (s.fill !== undefined) {
+      el.setAttribute("fill", s.fill);
+    }
+    if (s.stroke) {
+      el.setAttribute("stroke", s.stroke);
+      el.setAttribute("stroke-width", String(s.strokeWidth || 1));
+      el.setAttribute("stroke-linecap", "round");
+      el.setAttribute("stroke-linejoin", "round");
+    }
+    if (s.fillRule) el.setAttribute("fill-rule", s.fillRule);
   } else {
     return;
   }

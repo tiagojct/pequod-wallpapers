@@ -2,9 +2,7 @@
 
 import { makeRng, newSeed, isValidSeed } from "./prng.js";
 import { loadPalette } from "./palette.js";
-import { loadAllMotifs } from "./motifs.js";
 import { composeAbstract } from "./compose-abstract.js";
-import { composeMaritime } from "./compose-maritime.js";
 import { buildSVG, viewportFor } from "./render.js";
 import { exportPNG, exportSVG, makeFilename, thumbnailDataURL } from "./export.js";
 import { saveEntry, listEntries, deleteEntry, exportGalleryJSON } from "./gallery.js";
@@ -39,14 +37,12 @@ const ALL_ACCENTS = [
 const PNG_LONG_SIDE = 2880;
 
 let palette = null;
-let motifsCache = null;
 let state = { ...DEFAULT_STATE };
 let lastSVG = null;
 let lastComposition = null;
 
 async function init() {
   palette = await loadPalette();
-  motifsCache = await loadAllMotifs();
 
   const fromURL = readStateFromURL();
   state = { ...DEFAULT_STATE, ...fromURL };
@@ -108,10 +104,6 @@ function buildAccentLockUI() {
 
 function attachControls() {
   document.getElementById("regenerate").addEventListener("click", () => {
-    regenerate({});
-  });
-  document.getElementById("mode").addEventListener("change", (e) => {
-    state.mode = e.target.value;
     regenerate({});
   });
   document.getElementById("theme").addEventListener("change", (e) => {
@@ -227,7 +219,6 @@ function attachControls() {
 }
 
 function syncControlsFromState() {
-  document.getElementById("mode").value = state.mode;
   document.getElementById("theme").value = state.theme;
   const presetKey = matchAspect(state.aspectW, state.aspectH);
   if (presetKey) {
@@ -266,10 +257,7 @@ function regenerate({ keepSeed = false, replaceURL = false } = {}) {
   if (!keepSeed) state.seed = newSeed();
   const rng = makeRng(state.seed);
   const vp = viewportFor(state.aspectW, state.aspectH);
-  const composition =
-    state.mode === "abstract"
-      ? composeAbstract(palette, rng, state, vp)
-      : composeMaritime(palette, rng, state, vp);
+  const composition = composeAbstract(palette, rng, state, vp);
   lastComposition = composition;
   rerender();
   document.getElementById("seed").value = state.seed;
@@ -283,7 +271,6 @@ function rerender() {
     aspectH: state.aspectH,
     watermark: state.watermark,
     seed: state.seed,
-    motifsCache,
   });
   const stage = document.getElementById("stage");
   stage.innerHTML = "";
