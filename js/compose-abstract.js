@@ -1,14 +1,18 @@
-// Abstract composition. One mode, six minimalist sub-styles, every
-// one centre-anchored. The vocabulary is Miró by way of Pequod:
-// biomorphic blobs, dots, crescents, asterisks, thin lines on a soft
-// painterly base.
+// Pequod wallpapers: a Miró-by-way-of-Pequod composition engine.
+// Six sub-styles, each producing a rich composed image: a soft
+// painterly ground, one or two confident primary forms, and a
+// supporting cast of small marks (dots, asterisks, snakes, wedges,
+// eyes, bars). All compositions use multiple accent colours when
+// available and balance forms around the geometric centre with
+// gentle asymmetry.
 //
-//   mist           rich Pequod ramp + optional soft centred stain
-//   field          three Rothko-style soft bands
-//   ripple         concentric soft rings centred on the geometric centre
-//   constellation  centred biomorphic blob + small dots arranged around it
-//   lunar          centred crescent + a small dot offset to one side
-//   signs          gradient base + a handful of small asterisks (Miró stars)
+//   mist           ground only (most minimal)
+//   field          three Rothko bands + one small mark on the focal
+//   ripple         centred concentric rings + a few orbital dots
+//   constellation  centred biomorphic blob + 5 to 9 marks around it
+//   lunar          centred crescent + companion dot + a few stars
+//   gesture        large sinuous snake-curve + scattered marks
+//   signs          a balanced grid of asterisks + small companions
 
 import {
   pickSurface,
@@ -23,7 +27,18 @@ const SUBSTYLES = [
   "ripple",
   "constellation",
   "lunar",
+  "gesture",
   "signs",
+];
+
+const MARK_TYPES = [
+  "dot",
+  "asterisk",
+  "snake",
+  "wedge",
+  "eye",
+  "smallring",
+  "bar",
 ];
 
 export function composeAbstract(p, rng, state, vp) {
@@ -37,6 +52,8 @@ export function composeAbstract(p, rng, state, vp) {
       name,
       hex: crewHex(p, name, state.theme),
     })),
+    inkHex: state.theme === "light" ? p.log["800"] : p.log["100"],
+    paperHex: state.theme === "light" ? p.log["50"] : p.log["950"],
   };
 
   const layout = renderSubstyle(p, rng, state, substyle, palette, vp);
@@ -64,6 +81,8 @@ function renderSubstyle(p, rng, state, substyle, palette, vp) {
       return renderConstellation(p, rng, state, palette, vp);
     case "lunar":
       return renderLunar(p, rng, state, palette, vp);
+    case "gesture":
+      return renderGesture(p, rng, state, palette, vp);
     case "signs":
       return renderSigns(p, rng, state, palette, vp);
     default:
@@ -72,8 +91,6 @@ function renderSubstyle(p, rng, state, substyle, palette, vp) {
 }
 
 // ── mist ────────────────────────────────────────────────────────────
-// Multi-stop Pequod gradient that grows from the centre. Optional
-// very-soft accent stain at the centre.
 function renderMist(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
   const direction = rng.weighted([
@@ -82,10 +99,10 @@ function renderMist(p, rng, state, palette, vp) {
     { value: "diagonal", weight: 1 },
   ]);
   const grad = buildGradient("g-base", direction, ramp, vp, rng);
-
   const shapes = [baseRect(vp, `url(#${grad.id})`)];
 
-  if (rng.next() > 0.3 && palette.accents.length > 0) {
+  // 30% chance of a single soft accent stain at the centre.
+  if (rng.next() > 0.7 && palette.accents.length > 0) {
     const accent = rng.pick(palette.accents);
     const r = rng.range(0.22, 0.4) * Math.min(vp.w, vp.h);
     shapes.push({
@@ -107,8 +124,6 @@ function renderMist(p, rng, state, palette, vp) {
 }
 
 // ── field ───────────────────────────────────────────────────────────
-// Three feathered horizontal bands; small focal accent band between
-// two larger flanking bands.
 function renderField(p, rng, state, palette, vp) {
   const swatches = swatchPool(p, palette, state.theme);
   const accentHex = palette.accents[0]?.hex || swatches[0];
@@ -125,10 +140,16 @@ function renderField(p, rng, state, palette, vp) {
   const shapes = [];
   shapes.push(featherRect(vp, cursor, upperH, upperHex));
   cursor += upperH + gap1;
+  const focalY = cursor;
   shapes.push(featherRect(vp, cursor, focalH, accentHex));
   cursor += focalH + gap2;
   const lowerH = Math.max(0.18 * vp.h, vp.h - cursor - 0.05 * vp.h);
   shapes.push(featherRect(vp, cursor, lowerH, lowerHex));
+
+  // A single small mark on the focal band, off-centre to add tension.
+  const markX = (rng.next() > 0.5 ? 0.32 : 0.68) * vp.w;
+  const markY = focalY + focalH / 2;
+  pushMark(shapes, "asterisk", markX, markY, 0.04 * Math.min(vp.w, vp.h), palette.inkHex, rng);
 
   return {
     shapes,
@@ -137,8 +158,6 @@ function renderField(p, rng, state, palette, vp) {
 }
 
 // ── ripple ──────────────────────────────────────────────────────────
-// Concentric soft rings centred on the geometric centre, over a
-// centred radial gradient base.
 function renderRipple(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
   const baseGrad = buildGradient("g-base", "radial", ramp, vp, rng);
@@ -173,6 +192,22 @@ function renderRipple(p, rng, state, palette, vp) {
     });
   }
 
+  // 4-6 small dots on a ring around the centre.
+  const orbitR = maxR * rng.range(0.55, 0.7);
+  const orbitCount = rng.int(4, 6);
+  const accentPool = palette.accents.length > 0
+    ? palette.accents.map((a) => a.hex)
+    : [palette.inkHex];
+  for (let i = 0; i < orbitCount; i++) {
+    const angle = (i / orbitCount) * Math.PI * 2 + rng.range(-0.15, 0.15);
+    const dx = cx + Math.cos(angle) * orbitR;
+    const dy = cy + Math.sin(angle) * orbitR;
+    pushMark(shapes, rng.weighted([
+      { value: "dot", weight: 4 },
+      { value: "asterisk", weight: 2 },
+    ]), dx, dy, rng.range(0.018, 0.03) * minDim, rng.pick(accentPool), rng);
+  }
+
   return {
     shapes,
     gradients: [baseGrad],
@@ -181,63 +216,55 @@ function renderRipple(p, rng, state, palette, vp) {
 }
 
 // ── constellation ───────────────────────────────────────────────────
-// One centred biomorphic blob and three to five small accent dots
-// arranged around it on radial spokes. Sometimes a thin curved line
-// passes through the blob.
 function renderConstellation(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
   const direction = rng.weighted([
     { value: "radial", weight: 4 },
-    { value: "vertical", weight: 1 },
+    { value: "vertical", weight: 2 },
+    { value: "diagonal", weight: 1 },
   ]);
   const grad = buildGradient("g-base", direction, ramp, vp, rng);
   const shapes = [baseRect(vp, `url(#${grad.id})`)];
 
-  const cx = vp.w / 2;
-  const cy = vp.h / 2;
+  const cx = vp.w / 2 + rng.range(-0.06, 0.06) * vp.w;
+  const cy = vp.h / 2 + rng.range(-0.06, 0.06) * vp.h;
   const minDim = Math.min(vp.w, vp.h);
-  const blobR = rng.range(0.2, 0.3) * minDim;
-  const blobHex = state.theme === "light" ? p.log["800"] : (palette.accents[0]?.hex || p.log["100"]);
+  const blobR = rng.range(0.22, 0.32) * minDim;
+
+  // Primary blob — usually ink, sometimes accent for boldness.
+  const blobHex = rng.next() > 0.7 && palette.accents.length > 0
+    ? palette.accents[0].hex
+    : palette.inkHex;
   shapes.push({
     type: "path",
     d: buildBlobPath(cx, cy, blobR, rng, rng.int(7, 9)),
     fill: blobHex,
   });
 
-  // Dots on radial spokes around the blob.
-  const dotCount = rng.int(3, 5);
-  const accent = palette.accents[0]?.hex || swatchPool(p, palette, state.theme)[0];
-  const dotPool = palette.accents.length > 0 ? palette.accents.map((a) => a.hex) : [blobHex];
-  for (let i = 0; i < dotCount; i++) {
-    const angle = (i / dotCount) * Math.PI * 2 + rng.range(-0.2, 0.2);
-    const distance = blobR * rng.range(1.6, 2.4);
-    const dx = cx + Math.cos(angle) * distance;
-    const dy = cy + Math.sin(angle) * distance;
-    const dr = rng.range(0.018, 0.04) * minDim;
+  // Inner highlight: a small lighter shape inside the blob.
+  if (rng.next() > 0.4) {
+    const innerR = blobR * rng.range(0.18, 0.32);
+    const innerCx = cx + rng.range(-0.3, 0.3) * blobR;
+    const innerCy = cy + rng.range(-0.3, 0.3) * blobR;
+    const innerHex = rng.pick(palette.accents.length > 0
+      ? palette.accents.map((a) => a.hex)
+      : [palette.paperHex]);
     shapes.push({
       type: "circle",
-      cx: dx,
-      cy: dy,
-      r: dr,
-      fill: rng.pick(dotPool),
+      cx: innerCx,
+      cy: innerCy,
+      r: innerR,
+      fill: innerHex,
     });
   }
 
-  // Optional thin straight line crossing the canvas.
+  // 5 to 9 marks of varied types around the blob.
+  const markCount = rng.int(5, 9);
+  scatterMarks(shapes, rng, palette, markCount, vp, { cx, cy, blobR }, MARK_TYPES);
+
+  // Optional large gesture line crossing through.
   if (rng.next() > 0.55) {
-    const angle = rng.range(-Math.PI / 8, Math.PI / 8);
-    const len = vp.w * 1.2;
-    const dx = (Math.cos(angle) * len) / 2;
-    const dy = (Math.sin(angle) * len) / 2;
-    shapes.push({
-      type: "line",
-      x1: cx - dx,
-      y1: cy - dy,
-      x2: cx + dx,
-      y2: cy + dy,
-      stroke: blobHex,
-      strokeWidth: 0.005 * minDim,
-    });
+    pushSnake(shapes, vp, rng, palette.inkHex, 1.0, 0.0035 * minDim);
   }
 
   return {
@@ -248,9 +275,6 @@ function renderConstellation(p, rng, state, palette, vp) {
 }
 
 // ── lunar ───────────────────────────────────────────────────────────
-// Large centred crescent (built from two overlapping circles, one in
-// the surface tone), a small offset companion dot, and a soft radial
-// background.
 function renderLunar(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
   const grad = buildGradient("g-base", "radial", ramp, vp, rng);
@@ -259,48 +283,72 @@ function renderLunar(p, rng, state, palette, vp) {
   const cx = vp.w / 2;
   const cy = vp.h / 2;
   const minDim = Math.min(vp.w, vp.h);
-  const outerR = rng.range(0.18, 0.26) * minDim;
+  const outerR = rng.range(0.2, 0.3) * minDim;
   const innerR = outerR * rng.range(0.85, 0.95);
   const offsetSign = rng.next() > 0.5 ? 1 : -1;
   const offset = outerR * rng.range(0.32, 0.5) * offsetSign;
 
-  const crescentHex = state.theme === "light" ? p.log["800"] : (palette.accents[0]?.hex || p.log["100"]);
-
-  // The crescent: full circle minus an offset circle in the surface
-  // tone. The mask circle uses the underlying gradient stop colour at
-  // the centre so it carves cleanly out of the foreground crescent.
-  shapes.push({
-    type: "circle",
-    cx,
-    cy,
-    r: outerR,
-    fill: crescentHex,
-  });
-  // A second circle in the same colour as the surface gradient at
-  // its lightest stop, slightly offset, so it carves a crescent.
-  const surfaceCutHex = state.theme === "light"
-    ? p.log["50"]
-    : p.log["950"];
+  const crescentHex = rng.next() > 0.7 && palette.accents.length > 0
+    ? palette.accents[0].hex
+    : palette.inkHex;
+  shapes.push({ type: "circle", cx, cy, r: outerR, fill: crescentHex });
   shapes.push({
     type: "circle",
     cx: cx + offset,
     cy,
     r: innerR,
-    fill: surfaceCutHex,
+    fill: palette.paperHex,
   });
 
-  // Companion dot on the outside of the crescent.
-  const dotAngle = offsetSign > 0 ? Math.PI : 0;
-  const dotDistance = outerR * 1.8;
-  const dotR = rng.range(0.02, 0.035) * minDim;
-  const dotHex = palette.accents[0]?.hex || crescentHex;
+  // Companion dot opposite the crescent's open side.
+  const companionAngle = offsetSign > 0 ? Math.PI : 0;
+  const companionDist = outerR * 1.9;
+  const companionR = rng.range(0.022, 0.038) * minDim;
+  const companionHex = palette.accents[0]?.hex || crescentHex;
   shapes.push({
     type: "circle",
-    cx: cx + Math.cos(dotAngle) * dotDistance,
-    cy: cy + Math.sin(dotAngle) * dotDistance,
-    r: dotR,
-    fill: dotHex,
+    cx: cx + Math.cos(companionAngle) * companionDist,
+    cy: cy + Math.sin(companionAngle) * companionDist,
+    r: companionR,
+    fill: companionHex,
   });
+
+  // 3 to 5 stars (asterisks) elsewhere on the canvas.
+  const starCount = rng.int(3, 5);
+  const accentPool = palette.accents.length > 0
+    ? palette.accents.map((a) => a.hex)
+    : [palette.inkHex];
+  const starPositions = arrangeAround(cx, cy, outerR * 2.6, starCount, rng, vp);
+  for (const pos of starPositions) {
+    pushMark(
+      shapes,
+      "asterisk",
+      pos.x,
+      pos.y,
+      rng.range(0.025, 0.045) * minDim,
+      rng.pick([palette.inkHex, ...accentPool]),
+      rng,
+    );
+  }
+
+  // Optional small wedge or eye for character.
+  if (rng.next() > 0.5) {
+    const extra = rng.weighted([
+      { value: "wedge", weight: 2 },
+      { value: "eye", weight: 1 },
+    ]);
+    const angle = rng.range(0, Math.PI * 2);
+    const dist = outerR * rng.range(2.5, 3.2);
+    pushMark(
+      shapes,
+      extra,
+      cx + Math.cos(angle) * dist,
+      cy + Math.sin(angle) * dist,
+      rng.range(0.04, 0.07) * minDim,
+      rng.pick(accentPool),
+      rng,
+    );
+  }
 
   return {
     shapes,
@@ -310,10 +358,57 @@ function renderLunar(p, rng, state, palette, vp) {
   };
 }
 
+// ── gesture ─────────────────────────────────────────────────────────
+// One large sinuous snake curve crossing the canvas as a hero
+// gesture, with 3 to 6 small marks in supporting positions.
+function renderGesture(p, rng, state, palette, vp) {
+  const ramp = buildPaperRamp(p, state.theme, rng);
+  const direction = rng.weighted([
+    { value: "vertical", weight: 3 },
+    { value: "diagonal", weight: 2 },
+    { value: "radial", weight: 1 },
+  ]);
+  const grad = buildGradient("g-base", direction, ramp, vp, rng);
+  const shapes = [baseRect(vp, `url(#${grad.id})`)];
+
+  const minDim = Math.min(vp.w, vp.h);
+  const snakeHex = rng.next() > 0.4 && palette.accents.length > 0
+    ? palette.accents[0].hex
+    : palette.inkHex;
+  pushSnake(shapes, vp, rng, snakeHex, 1.0, 0.012 * minDim);
+
+  // 3 to 6 supporting marks scattered, mostly at margins.
+  const markCount = rng.int(3, 6);
+  const accentPool = palette.accents.length > 0
+    ? palette.accents.map((a) => a.hex)
+    : [palette.inkHex];
+  const positions = arrangeFreeform(rng, markCount, vp, minDim * 0.18);
+  for (const pos of positions) {
+    const t = rng.weighted([
+      { value: "dot", weight: 3 },
+      { value: "asterisk", weight: 3 },
+      { value: "wedge", weight: 1 },
+      { value: "smallring", weight: 1 },
+    ]);
+    pushMark(
+      shapes,
+      t,
+      pos.x,
+      pos.y,
+      rng.range(0.025, 0.05) * minDim,
+      rng.pick([palette.inkHex, ...accentPool]),
+      rng,
+    );
+  }
+
+  return {
+    shapes,
+    gradients: [grad],
+    grain: { intensity: 0.09, freq: rng.range(0.85, 1.05) },
+  };
+}
+
 // ── signs ───────────────────────────────────────────────────────────
-// Gradient base with a handful of small Miró asterisks (thin crossed
-// lines through a point) arranged in a balanced layout. One sign at
-// centre, others on a roughly symmetric grid.
 function renderSigns(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
   const direction = rng.weighted([
@@ -325,12 +420,14 @@ function renderSigns(p, rng, state, palette, vp) {
   const shapes = [baseRect(vp, `url(#${grad.id})`)];
 
   const minDim = Math.min(vp.w, vp.h);
-  const inkHex = state.theme === "light" ? p.log["800"] : p.log["100"];
-  const accentHex = palette.accents[0]?.hex || inkHex;
+  const accentPool = palette.accents.length > 0
+    ? palette.accents.map((a) => a.hex)
+    : [palette.inkHex];
 
-  // Symmetric set of star positions: one centre, four on the
-  // diagonals, optionally two on the cardinals.
-  const positions = [{ cx: 0.5, cy: 0.5, accent: true }];
+  // A balanced sign field: a centre asterisk plus four to six in a
+  // symmetric arrangement, plus one or two small companion forms
+  // (eye, wedge, smallring) for character.
+  const positions = [{ cx: 0.5, cy: 0.5, accent: true, primary: true }];
   const layout = rng.weighted([
     { value: "diagonal", weight: 3 },
     { value: "cardinal", weight: 2 },
@@ -347,11 +444,10 @@ function renderSigns(p, rng, state, palette, vp) {
     positions.push(
       { cx: 0.5, cy: 0.18 },
       { cx: 0.5, cy: 0.82 },
-      { cx: 0.2, cy: 0.5 },
-      { cx: 0.8, cy: 0.5 },
+      { cx: 0.18, cy: 0.5 },
+      { cx: 0.82, cy: 0.5 },
     );
   } else {
-    // Scatter: rule-of-thirds diagonally
     positions.push(
       { cx: 1 / 3, cy: 1 / 3 },
       { cx: 2 / 3, cy: 2 / 3 },
@@ -359,9 +455,6 @@ function renderSigns(p, rng, state, palette, vp) {
       { cx: 2 / 3, cy: 1 / 3 },
     );
   }
-
-  // Sometimes drop one position randomly so layouts are not always
-  // the same five-point pattern.
   if (rng.next() > 0.5 && positions.length > 3) {
     positions.splice(rng.int(1, positions.length - 1), 1);
   }
@@ -369,22 +462,39 @@ function renderSigns(p, rng, state, palette, vp) {
   for (const pos of positions) {
     const x = pos.cx * vp.w;
     const y = pos.cy * vp.h;
-    const size = (pos.accent ? rng.range(0.06, 0.09) : rng.range(0.04, 0.065)) * minDim;
-    shapes.push({
-      type: "path",
-      d: buildAsteriskPath(x, y, size, rng.int(4, 6)),
-      fill: "none",
-      stroke: pos.accent ? accentHex : inkHex,
-      strokeWidth: rng.range(0.0035, 0.006) * minDim,
-    });
-    // A small filled dot at the centre of each star.
-    shapes.push({
-      type: "circle",
-      cx: x,
-      cy: y,
-      r: 0.006 * minDim,
-      fill: pos.accent ? accentHex : inkHex,
-    });
+    const t = pos.primary
+      ? "asterisk"
+      : rng.weighted([
+          { value: "asterisk", weight: 5 },
+          { value: "dot", weight: 2 },
+          { value: "wedge", weight: 1 },
+        ]);
+    const size = (pos.primary ? rng.range(0.07, 0.1) : rng.range(0.04, 0.065)) * minDim;
+    const hex = pos.accent ? rng.pick(accentPool) : palette.inkHex;
+    pushMark(shapes, t, x, y, size, hex, rng);
+  }
+
+  // 1 to 2 small extra characters (eye or smallring) for surprise.
+  const extras = rng.int(1, 2);
+  for (let i = 0; i < extras; i++) {
+    const angle = rng.range(0, Math.PI * 2);
+    const dist = rng.range(0.25, 0.4) * Math.min(vp.w, vp.h);
+    const x = vp.w / 2 + Math.cos(angle) * dist;
+    const y = vp.h / 2 + Math.sin(angle) * dist;
+    const t = rng.weighted([
+      { value: "eye", weight: 2 },
+      { value: "smallring", weight: 2 },
+      { value: "bar", weight: 1 },
+    ]);
+    pushMark(
+      shapes,
+      t,
+      x,
+      y,
+      rng.range(0.04, 0.07) * minDim,
+      rng.pick(accentPool),
+      rng,
+    );
   }
 
   return {
@@ -394,27 +504,113 @@ function renderSigns(p, rng, state, palette, vp) {
   };
 }
 
-// ── shape helpers ───────────────────────────────────────────────────
+// ── mark builder ────────────────────────────────────────────────────
 
-function baseRect(vp, fill) {
-  return { type: "rect", x: 0, y: 0, w: vp.w, h: vp.h, fill };
+function pushMark(shapes, type, x, y, size, fill, rng) {
+  const minStroke = size * 0.08;
+  switch (type) {
+    case "dot":
+      shapes.push({ type: "circle", cx: x, cy: y, r: size * 0.5, fill });
+      break;
+    case "asterisk": {
+      const rays = rng.int(4, 6);
+      shapes.push({
+        type: "path",
+        d: buildAsteriskPath(x, y, size, rays),
+        fill: "none",
+        stroke: fill,
+        strokeWidth: minStroke,
+      });
+      shapes.push({ type: "circle", cx: x, cy: y, r: size * 0.06, fill });
+      break;
+    }
+    case "snake":
+      shapes.push({
+        type: "path",
+        d: buildSnakePath(x, y, size, rng),
+        fill: "none",
+        stroke: fill,
+        strokeWidth: minStroke,
+      });
+      break;
+    case "wedge": {
+      const rot = rng.range(0, Math.PI * 2);
+      const half = size * 0.5;
+      const points = [
+        [x + Math.cos(rot) * half, y + Math.sin(rot) * half],
+        [
+          x + Math.cos(rot + (2 * Math.PI) / 3) * half,
+          y + Math.sin(rot + (2 * Math.PI) / 3) * half,
+        ],
+        [
+          x + Math.cos(rot + (4 * Math.PI) / 3) * half,
+          y + Math.sin(rot + (4 * Math.PI) / 3) * half,
+        ],
+      ];
+      shapes.push({ type: "polygon", points, fill });
+      break;
+    }
+    case "eye": {
+      const rx = size * 0.5;
+      const ry = size * 0.28;
+      const rot = rng.next() > 0.5 ? 0 : 90;
+      shapes.push({
+        type: "path",
+        d: buildEllipsePath(x, y, rx, ry, rot),
+        fill,
+      });
+      shapes.push({
+        type: "circle",
+        cx: x,
+        cy: y,
+        r: ry * 0.5,
+        fill: fill === "#0D2F42" ? "#EAE1D7" : "#0D2F42",
+        fillOpacity: 0.85,
+      });
+      break;
+    }
+    case "smallring":
+      shapes.push({
+        type: "ring",
+        cx: x,
+        cy: y,
+        r: size * 0.5,
+        stroke: fill,
+        strokeWidth: minStroke,
+      });
+      break;
+    case "bar": {
+      const angle = rng.range(0, Math.PI);
+      const len = size;
+      const w = size * 0.18;
+      const dx = Math.cos(angle) * len * 0.5;
+      const dy = Math.sin(angle) * len * 0.5;
+      shapes.push({
+        type: "line",
+        x1: x - dx,
+        y1: y - dy,
+        x2: x + dx,
+        y2: y + dy,
+        stroke: fill,
+        strokeWidth: w,
+      });
+      break;
+    }
+  }
 }
 
-function featherRect(vp, y, h, fill) {
-  return {
-    type: "rect",
-    x: -0.06 * vp.w,
-    y,
-    w: 1.12 * vp.w,
-    h,
-    fill,
-    feather: 1,
-  };
+function pushSnake(shapes, vp, rng, hex, lengthFactor, strokeW) {
+  shapes.push({
+    type: "path",
+    d: buildLargeSnakePath(vp, rng, lengthFactor),
+    fill: "none",
+    stroke: hex,
+    strokeWidth: strokeW,
+  });
 }
 
-// Catmull-Rom-to-Bezier closed blob with `sides` sample points around
-// the centre, each radius perturbed by 30 percent. Returns an SVG
-// path d-string.
+// ── path builders ───────────────────────────────────────────────────
+
 function buildBlobPath(cx, cy, baseR, rng, sides = 8) {
   const points = [];
   for (let i = 0; i < sides; i++) {
@@ -437,8 +633,6 @@ function buildBlobPath(cx, cy, baseR, rng, sides = 8) {
   return d + " Z";
 }
 
-// Asterisk: `rays` thin lines crossing at the point (cx, cy), each
-// half-length size/2. Returned as a path with multiple subpaths.
 function buildAsteriskPath(cx, cy, size, rays) {
   let d = "";
   for (let i = 0; i < rays; i++) {
@@ -448,6 +642,150 @@ function buildAsteriskPath(cx, cy, size, rays) {
     d += `M ${(cx - dx).toFixed(2)} ${(cy - dy).toFixed(2)} L ${(cx + dx).toFixed(2)} ${(cy + dy).toFixed(2)} `;
   }
   return d.trim();
+}
+
+// A small sinuous curve ~size wide, rotated by a random angle. Used
+// for "snake" marks in scatter contexts.
+function buildSnakePath(cx, cy, size, rng) {
+  const half = size * 0.5;
+  const angle = rng.range(0, Math.PI * 2);
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  // Local: start at -half, end at +half, with sinusoidal wave on y.
+  const points = [
+    [-half, 0],
+    [-half * 0.5, -size * 0.25],
+    [0, size * 0.18],
+    [half * 0.5, -size * 0.18],
+    [half, 0],
+  ];
+  // Rotate and translate.
+  const rotated = points.map(([x, y]) => [cx + x * cosA - y * sinA, cy + x * sinA + y * cosA]);
+  // Build a smooth bezier through them.
+  let d = `M ${rotated[0][0].toFixed(2)} ${rotated[0][1].toFixed(2)}`;
+  for (let i = 0; i < rotated.length - 1; i++) {
+    const p0 = rotated[Math.max(0, i - 1)];
+    const p1 = rotated[i];
+    const p2 = rotated[i + 1];
+    const p3 = rotated[Math.min(rotated.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 4;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 4;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 4;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 4;
+    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
+// A long sinuous curve crossing the canvas. Used as a hero gesture.
+function buildLargeSnakePath(vp, rng, lengthFactor = 1.0) {
+  // Pick a primary direction (mostly horizontal or vertical).
+  const horizontal = rng.next() > 0.4;
+  const cx = vp.w / 2;
+  const cy = vp.h / 2;
+  const span = (horizontal ? vp.w : vp.h) * lengthFactor;
+  const amp = (horizontal ? vp.h : vp.w) * 0.18 * (rng.next() > 0.5 ? 1 : -1);
+  const segments = 4;
+  const points = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const u = (t - 0.5) * span;
+    const v = Math.sin(t * Math.PI * 2) * amp;
+    if (horizontal) points.push([cx + u, cy + v]);
+    else points.push([cx + v, cy + u]);
+  }
+  let d = `M ${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 4;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 4;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 4;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 4;
+    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
+function buildEllipsePath(cx, cy, rx, ry, rotDeg) {
+  const r = (rotDeg * Math.PI) / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  const x1 = cx - rx * c;
+  const y1 = cy - rx * s;
+  const x2 = cx + rx * c;
+  const y2 = cy + rx * s;
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${rotDeg} 0 0 ${x2.toFixed(2)} ${y2.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${rotDeg} 0 0 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`;
+}
+
+// ── arrangement helpers ────────────────────────────────────────────
+
+function arrangeAround(cx, cy, radius, count, rng, vp) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + rng.range(-0.25, 0.25);
+    const r = radius * rng.range(0.85, 1.2);
+    out.push({
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r,
+    });
+  }
+  return out;
+}
+
+function scatterMarks(shapes, rng, palette, count, vp, primary, types) {
+  const minDim = Math.min(vp.w, vp.h);
+  const accentPool = palette.accents.length > 0
+    ? palette.accents.map((a) => a.hex)
+    : [palette.inkHex];
+  const colorPool = [palette.inkHex, ...accentPool];
+
+  const placed = [];
+  for (let i = 0; i < count; i++) {
+    let tries = 0;
+    let pos = null;
+    while (tries < 12 && !pos) {
+      const angle = rng.range(0, Math.PI * 2);
+      const dist = primary.blobR * rng.range(1.5, 2.6);
+      const x = primary.cx + Math.cos(angle) * dist;
+      const y = primary.cy + Math.sin(angle) * dist;
+      const margin = minDim * 0.05;
+      if (x < margin || x > vp.w - margin || y < margin || y > vp.h - margin) {
+        tries++;
+        continue;
+      }
+      // Avoid clustering with previous marks.
+      const tooClose = placed.some(
+        (q) => Math.hypot(q.x - x, q.y - y) < minDim * 0.07,
+      );
+      if (tooClose) {
+        tries++;
+        continue;
+      }
+      pos = { x, y };
+    }
+    if (!pos) continue;
+    placed.push(pos);
+
+    const type = rng.pick(types);
+    const baseSize = type === "snake" || type === "eye" ? rng.range(0.05, 0.085) : rng.range(0.025, 0.05);
+    pushMark(shapes, type, pos.x, pos.y, baseSize * minDim, rng.pick(colorPool), rng);
+  }
+}
+
+function arrangeFreeform(rng, count, vp, minSpacing) {
+  const out = [];
+  let tries = 0;
+  while (out.length < count && tries < 200) {
+    tries++;
+    const x = rng.range(0.1, 0.9) * vp.w;
+    const y = rng.range(0.1, 0.9) * vp.h;
+    const tooClose = out.some((p) => Math.hypot(p.x - x, p.y - y) < minSpacing);
+    if (!tooClose) out.push({ x, y });
+  }
+  return out;
 }
 
 // ── ramps and gradients ─────────────────────────────────────────────
@@ -497,7 +835,23 @@ export function buildGradient(id, direction, stops, vp, rng) {
   return { id, type: "linear", x1, y1, x2, y2, stops };
 }
 
-// ── defaults and pools ──────────────────────────────────────────────
+// ── helpers ─────────────────────────────────────────────────────────
+
+function baseRect(vp, fill) {
+  return { type: "rect", x: 0, y: 0, w: vp.w, h: vp.h, fill };
+}
+
+function featherRect(vp, y, h, fill) {
+  return {
+    type: "rect",
+    x: -0.06 * vp.w,
+    y,
+    w: 1.12 * vp.w,
+    h,
+    fill,
+    feather: 1,
+  };
+}
 
 function defaultGrain(rng) {
   return { intensity: 0.1, freq: rng.range(0.8, 1.05) };

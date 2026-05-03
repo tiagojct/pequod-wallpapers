@@ -345,6 +345,7 @@ function appendShape(parent, s, NS) {
   } else {
     return;
   }
+  if (s.fillOpacity !== undefined) el.setAttribute("fill-opacity", String(s.fillOpacity));
   if (s.__blurId) el.setAttribute("filter", `url(#${s.__blurId})`);
   if (s.blend) el.setAttribute("style", `mix-blend-mode: ${s.blend}`);
   parent.appendChild(el);
