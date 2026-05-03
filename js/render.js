@@ -1,12 +1,21 @@
-// Builds an SVG element from a composition descriptor. The composition
-// uses the viewport dimensions directly (long axis = 1000, short axis
-// scaled to aspect), so no letterboxing or cropping is needed.
+// Builds an SVG element from a composition descriptor. Layered in
+// strict order so each composition reads as one image, not a stack of
+// flats:
+//
+//   1. base surface fill (in case shapes do not cover everything)
+//   2. <defs>: filters (grain, soft-blur, motif-shadow, feather) and
+//      gradients declared by the composition
+//   3. shape group: composition.shapes (gradients-as-fills, blends,
+//      blurs, feathered bands)
+//   4. motif group: composition.motifs (with optional drop shadow)
+//   5. paper-grain wash (turbulence noise, multiply blend, low alpha)
+//   6. vignette (radial gradient overlay, very subtle)
 
 import { cloneMotif } from "./motifs.js";
-import { rgba } from "./palette.js";
+import { rgba, cyrb53OrZero } from "./palette.js";
 
+// Long axis = 1000, short axis scaled to aspect.
 export function viewportFor(aspectW, aspectH) {
-  // Long axis = 1000; short axis scaled to aspect.
   if (aspectW >= aspectH) {
     return { w: 1000, h: (1000 * aspectH) / aspectW };
   }
@@ -23,63 +32,155 @@ export function buildSVG(composition, options) {
   svg.setAttribute("viewBox", `0 0 ${vbW} ${vbH}`);
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
-  // Surface background.
-  const bg = document.createElementNS(NS, "rect");
-  bg.setAttribute("x", 0);
-  bg.setAttribute("y", 0);
-  bg.setAttribute("width", vbW);
-  bg.setAttribute("height", vbH);
-  bg.setAttribute("fill", composition.surface.hex);
-  svg.appendChild(bg);
-
-  // Defs for filters and gradients.
   const defs = document.createElementNS(NS, "defs");
-  // Strong feather filter, used by colour-field bands (Rothko soft edges).
-  const feather = document.createElementNS(NS, "filter");
-  feather.setAttribute("id", "feather");
-  feather.setAttribute("x", "-15%");
-  feather.setAttribute("y", "-15%");
-  feather.setAttribute("width", "130%");
-  feather.setAttribute("height", "130%");
-  const blur = document.createElementNS(NS, "feGaussianBlur");
-  blur.setAttribute("stdDeviation", String(Math.max(8, Math.min(vbW, vbH) * 0.024)));
-  feather.appendChild(blur);
-  defs.appendChild(feather);
 
-  // Gradients defined by the composition.
+  // Feather: a strong gaussian for Rothko-style band edges. The blur
+  // amount scales with the viewport so the look is consistent across
+  // aspects.
+  const featherStd = Math.max(8, Math.min(vbW, vbH) * 0.024);
+  defs.appendChild(makeFilter(NS, "feather", -0.15, 1.3, [
+    feGaussianBlur(NS, featherStd),
+  ]));
+
+  // Soft-blur: a gentle blur for shapes that should feel like ink
+  // stains rather than vector primitives.
+  defs.appendChild(makeFilter(NS, "soft-blur", -0.25, 1.5, [
+    feGaussianBlur(NS, Math.max(4, Math.min(vbW, vbH) * 0.012)),
+  ]));
+
+  // Per-shape blur: each shape that requests its own blur radius gets
+  // a unique filter so blurs do not interact.
+
+  // Grain: a turbulence-based noise wash. Seed is derived from the
+  // composition seed so the texture varies between regenerations but
+  // is stable for a given seed.
+  const noiseSeed = (cyrb53OrZero(seed || "") % 1000) >>> 0;
+  const grainConfig = composition.grain || { intensity: 0.1, freq: 0.95 };
+  defs.appendChild(buildGrainFilter(NS, "grain", noiseSeed, grainConfig.freq));
+
+  // Motif drop shadow: very soft, slightly offset.
+  defs.appendChild(makeFilter(NS, "motif-shadow", -0.2, 1.4, [
+    (() => {
+      const blur = document.createElementNS(NS, "feGaussianBlur");
+      blur.setAttribute("in", "SourceAlpha");
+      blur.setAttribute("stdDeviation", String(Math.min(vbW, vbH) * 0.008));
+      return blur;
+    })(),
+    (() => {
+      const offset = document.createElementNS(NS, "feOffset");
+      offset.setAttribute("dx", String(Math.min(vbW, vbH) * 0.004));
+      offset.setAttribute("dy", String(Math.min(vbW, vbH) * 0.006));
+      offset.setAttribute("result", "offsetBlur");
+      return offset;
+    })(),
+    (() => {
+      const flood = document.createElementNS(NS, "feFlood");
+      flood.setAttribute("flood-color", "#000000");
+      flood.setAttribute("flood-opacity", "0.28");
+      return flood;
+    })(),
+    (() => {
+      const composite = document.createElementNS(NS, "feComposite");
+      composite.setAttribute("in2", "offsetBlur");
+      composite.setAttribute("operator", "in");
+      return composite;
+    })(),
+    (() => {
+      const merge = document.createElementNS(NS, "feMerge");
+      const m1 = document.createElementNS(NS, "feMergeNode");
+      const m2 = document.createElementNS(NS, "feMergeNode");
+      m2.setAttribute("in", "SourceGraphic");
+      merge.appendChild(m1);
+      merge.appendChild(m2);
+      return merge;
+    })(),
+  ]));
+
+  // Per-shape blur filters and gradients declared by the composition.
+  let blurCounter = 0;
+  for (const s of composition.shapes || []) {
+    if (s.blur) {
+      s.__blurId = `b-${blurCounter++}`;
+      defs.appendChild(makeFilter(NS, s.__blurId, -0.4, 1.8, [
+        feGaussianBlur(NS, s.blur),
+      ]));
+    }
+  }
+
   for (const g of composition.gradients || []) {
     defs.appendChild(buildGradientNode(g, NS));
   }
+
+  // Vignette: a radial gradient that is transparent in the centre and
+  // dark at the corners. Built per render so the radius matches the
+  // viewport.
+  const vignetteIntensity = composition.vignette?.intensity ?? 0.14;
+  defs.appendChild(buildVignetteGradient(NS, vbW, vbH, vignetteIntensity));
+
   svg.appendChild(defs);
 
-  const shapeGroup = document.createElementNS(NS, "g");
-  svg.appendChild(shapeGroup);
+  // 1. Surface base.
+  const bg = document.createElementNS(NS, "rect");
+  bg.setAttribute("x", "0");
+  bg.setAttribute("y", "0");
+  bg.setAttribute("width", String(vbW));
+  bg.setAttribute("height", String(vbH));
+  bg.setAttribute("fill", composition.surface.hex);
+  svg.appendChild(bg);
 
+  // 3. Shape group.
+  const shapeGroup = document.createElementNS(NS, "g");
   for (const s of composition.shapes || []) {
     appendShape(shapeGroup, s, NS);
   }
+  svg.appendChild(shapeGroup);
 
-  for (const m of composition.motifs || []) {
-    if (!motifsCache[m.name]) continue;
-    const node = cloneMotif(motifsCache[m.name], m.fill);
-    // Nested SVG without explicit width/height defaults to 100% of the
-    // outer viewport. Lock it to the motif's intrinsic 100x100 box so
-    // the surrounding scale() places the motif at the requested size.
-    node.setAttribute("width", "100");
-    node.setAttribute("height", "100");
-    const wrap = document.createElementNS(NS, "g");
-    wrap.setAttribute(
-      "transform",
-      `translate(${m.x}, ${m.y}) scale(${m.size / 100}) ` +
-        (m.rotate
-          ? `rotate(${m.rotate} 50 50)`
-          : ""),
-    );
-    wrap.appendChild(node);
-    shapeGroup.appendChild(wrap);
+  // 4. Motif group.
+  if (composition.motifs && composition.motifs.length > 0) {
+    const motifGroup = document.createElementNS(NS, "g");
+    for (const m of composition.motifs) {
+      if (!motifsCache[m.name]) continue;
+      const node = cloneMotif(motifsCache[m.name], m.fill);
+      // Lock nested SVG to its 100x100 box so the surrounding scale()
+      // produces the requested pixel size.
+      node.setAttribute("width", "100");
+      node.setAttribute("height", "100");
+      const wrap = document.createElementNS(NS, "g");
+      wrap.setAttribute(
+        "transform",
+        `translate(${m.x}, ${m.y}) scale(${m.size / 100}) ` +
+          (m.rotate ? `rotate(${m.rotate} 50 50)` : ""),
+      );
+      if (m.shadow) wrap.setAttribute("filter", "url(#motif-shadow)");
+      wrap.appendChild(node);
+      motifGroup.appendChild(wrap);
+    }
+    svg.appendChild(motifGroup);
   }
 
-  // Watermark in the bottom-right corner of the visible area.
+  // 5. Paper-grain wash. Multiply blend so the noise modulates without
+  // washing out the colour beneath.
+  const grainRect = document.createElementNS(NS, "rect");
+  grainRect.setAttribute("x", "0");
+  grainRect.setAttribute("y", "0");
+  grainRect.setAttribute("width", String(vbW));
+  grainRect.setAttribute("height", String(vbH));
+  grainRect.setAttribute("filter", "url(#grain)");
+  grainRect.setAttribute("opacity", String(grainConfig.intensity));
+  grainRect.setAttribute("style", "mix-blend-mode: multiply");
+  svg.appendChild(grainRect);
+
+  // 6. Vignette overlay.
+  const vignetteRect = document.createElementNS(NS, "rect");
+  vignetteRect.setAttribute("x", "0");
+  vignetteRect.setAttribute("y", "0");
+  vignetteRect.setAttribute("width", String(vbW));
+  vignetteRect.setAttribute("height", String(vbH));
+  vignetteRect.setAttribute("fill", "url(#g-vignette)");
+  vignetteRect.setAttribute("style", "mix-blend-mode: multiply");
+  svg.appendChild(vignetteRect);
+
+  // Watermark stays on top of everything.
   if (watermark) {
     const wmText = document.createElementNS(NS, "text");
     wmText.textContent = `pequod-wallpapers . ${seed}`;
@@ -100,28 +201,110 @@ export function buildSVG(composition, options) {
   return { svg, vbW, vbH };
 }
 
+function makeFilter(NS, id, padNeg, padFull, children) {
+  const filter = document.createElementNS(NS, "filter");
+  filter.setAttribute("id", id);
+  filter.setAttribute("x", `${padNeg * 100}%`);
+  filter.setAttribute("y", `${padNeg * 100}%`);
+  filter.setAttribute("width", `${padFull * 100}%`);
+  filter.setAttribute("height", `${padFull * 100}%`);
+  for (const c of children) filter.appendChild(c);
+  return filter;
+}
+
+function feGaussianBlur(NS, std) {
+  const blur = document.createElementNS(NS, "feGaussianBlur");
+  blur.setAttribute("stdDeviation", String(std));
+  return blur;
+}
+
+function buildGrainFilter(NS, id, seed, freq) {
+  const filter = document.createElementNS(NS, "filter");
+  filter.setAttribute("id", id);
+  filter.setAttribute("x", "0%");
+  filter.setAttribute("y", "0%");
+  filter.setAttribute("width", "100%");
+  filter.setAttribute("height", "100%");
+
+  const turb = document.createElementNS(NS, "feTurbulence");
+  turb.setAttribute("type", "fractalNoise");
+  turb.setAttribute("baseFrequency", String(freq));
+  turb.setAttribute("numOctaves", "2");
+  turb.setAttribute("seed", String(seed));
+  turb.setAttribute("stitchTiles", "stitch");
+  filter.appendChild(turb);
+
+  // Tint the noise to a warm grey so it reads as paper, not screen
+  // static, then desaturate slightly.
+  const cm = document.createElementNS(NS, "feColorMatrix");
+  cm.setAttribute("type", "matrix");
+  // R G B A
+  // Push everything toward a warm grey, low overall intensity. The
+  // shape-rendering rect carries the opacity and blend mode so this
+  // colour matrix only needs to set the tone, not the strength.
+  cm.setAttribute("values", [
+    "0 0 0 0 0.55",
+    "0 0 0 0 0.50",
+    "0 0 0 0 0.46",
+    "0 0 0 1 0",
+  ].join(" "));
+  filter.appendChild(cm);
+
+  return filter;
+}
+
+function buildVignetteGradient(NS, vbW, vbH, intensity) {
+  const grad = document.createElementNS(NS, "radialGradient");
+  grad.setAttribute("id", "g-vignette");
+  grad.setAttribute("cx", String(vbW / 2));
+  grad.setAttribute("cy", String(vbH / 2));
+  grad.setAttribute("r", String(Math.max(vbW, vbH) * 0.7));
+  grad.setAttribute("gradientUnits", "userSpaceOnUse");
+  // Transparent in the centre, multiplied with a soft warm dark at the
+  // corners.
+  const s1 = document.createElementNS(NS, "stop");
+  s1.setAttribute("offset", "0");
+  s1.setAttribute("stop-color", "#ffffff");
+  s1.setAttribute("stop-opacity", "1");
+  grad.appendChild(s1);
+  const s2 = document.createElementNS(NS, "stop");
+  s2.setAttribute("offset", "0.55");
+  s2.setAttribute("stop-color", "#ffffff");
+  s2.setAttribute("stop-opacity", "0.95");
+  grad.appendChild(s2);
+  const s3 = document.createElementNS(NS, "stop");
+  s3.setAttribute("offset", "1");
+  // Dark warm tone for vignette. Mapping intensity 0..1 to alpha.
+  const alpha = clamp(intensity, 0, 0.4);
+  s3.setAttribute("stop-color", "#0d1f2a");
+  s3.setAttribute("stop-opacity", String(1 - alpha * 1.2));
+  grad.appendChild(s3);
+  return grad;
+}
+
 function buildGradientNode(g, NS) {
   let el;
   if (g.type === "radial") {
     el = document.createElementNS(NS, "radialGradient");
     el.setAttribute("id", g.id);
-    el.setAttribute("cx", g.cx);
-    el.setAttribute("cy", g.cy);
-    el.setAttribute("r", g.r);
+    el.setAttribute("cx", String(g.cx));
+    el.setAttribute("cy", String(g.cy));
+    el.setAttribute("r", String(g.r));
     el.setAttribute("gradientUnits", "userSpaceOnUse");
   } else {
     el = document.createElementNS(NS, "linearGradient");
     el.setAttribute("id", g.id);
-    el.setAttribute("x1", g.x1);
-    el.setAttribute("y1", g.y1);
-    el.setAttribute("x2", g.x2);
-    el.setAttribute("y2", g.y2);
+    el.setAttribute("x1", String(g.x1));
+    el.setAttribute("y1", String(g.y1));
+    el.setAttribute("x2", String(g.x2));
+    el.setAttribute("y2", String(g.y2));
     el.setAttribute("gradientUnits", "userSpaceOnUse");
   }
   for (const s of g.stops) {
     const stop = document.createElementNS(NS, "stop");
     stop.setAttribute("offset", String(s.offset));
     stop.setAttribute("stop-color", s.color);
+    if (s.opacity !== undefined) stop.setAttribute("stop-opacity", String(s.opacity));
     el.appendChild(stop);
   }
   return el;
@@ -160,6 +343,7 @@ function appendShape(parent, s, NS) {
   } else {
     return;
   }
+  if (s.__blurId) el.setAttribute("filter", `url(#${s.__blurId})`);
   if (s.blend) el.setAttribute("style", `mix-blend-mode: ${s.blend}`);
   parent.appendChild(el);
 }
@@ -167,4 +351,8 @@ function appendShape(parent, s, NS) {
 function isLight(step) {
   const n = parseInt(step, 10);
   return n <= 500;
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
 }

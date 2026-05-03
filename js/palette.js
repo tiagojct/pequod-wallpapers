@@ -117,3 +117,20 @@ export function rgba(hex, a) {
   const b = parseInt(h.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
+
+// Lightweight cyrb53-derived integer for non-cryptographic uses (e.g.
+// driving the SVG turbulence seed). Returns 0 for an empty string so
+// callers can safely depend on it before a seed has been generated.
+export function cyrb53OrZero(s) {
+  if (!s) return 0;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  return h1 >>> 0;
+}
