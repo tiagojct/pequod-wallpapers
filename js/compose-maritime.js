@@ -1,10 +1,13 @@
-// Maritime mode: three sub-styles, every one atmospheric. Like the
-// abstract sub-styles, each composition layers a base (gradient),
-// motifs on top, paper-grain wash, and a vignette.
+// Maritime mode: three center-anchored sub-styles. Motifs land on
+// the centre line; concentric patterns grow outward from the
+// geometric centre. Symmetric, iconic, like a stamp or a seal.
 //
-//   horizon     sky gradient meeting sea gradient + motif on horizon
-//   silhouette  rich gradient base + one large dark motif on thirds
-//   departing   moody gradient + small motif near an edge
+//   horizon     sky gradient meeting sea gradient + centred motif
+//               on the horizon line
+//   silhouette  centred radial gradient + one large dark motif at
+//               the geometric centre
+//   beacon      centred motif surrounded by 6 to 9 concentric soft
+//               rings emanating outward, on a soft radial base
 
 import {
   pickSurface,
@@ -15,8 +18,7 @@ import {
 import { MOTIF_NAMES } from "./motifs.js";
 import { buildPaperRamp, buildGradient } from "./compose-abstract.js";
 
-const SUBSTYLES = ["horizon", "silhouette", "departing"];
-const THIRDS = [1 / 3, 2 / 3];
+const SUBSTYLES = ["horizon", "silhouette", "beacon"];
 
 export function composeMaritime(p, rng, state, vp) {
   const substyle = rng.pick(SUBSTYLES);
@@ -51,19 +53,19 @@ function renderSubstyle(p, rng, state, substyle, palette, vp) {
       return renderHorizon(p, rng, state, palette, vp);
     case "silhouette":
       return renderSilhouette(p, rng, state, palette, vp);
-    case "departing":
-      return renderDeparting(p, rng, state, palette, vp);
+    case "beacon":
+      return renderBeacon(p, rng, state, palette, vp);
     default:
       return { shapes: [], motifs: [] };
   }
 }
 
-// horizon: two stacked vertical gradients meeting at a horizon line,
-// with a single motif silhouette on or just above the horizon.
+// horizon: two stacked vertical gradients meeting at the horizon
+// line. The motif is centred horizontally and sits on the horizon.
 function renderHorizon(p, rng, state, palette, vp) {
-  const horizonY = rng.range(0.42, 0.62) * vp.h;
-  const skyRamp = buildSkyRamp(p, state.theme, rng);
-  const seaRamp = buildSeaRamp(p, state.theme, rng);
+  const horizonY = rng.range(0.45, 0.6) * vp.h;
+  const skyRamp = buildSkyRamp(p, state.theme);
+  const seaRamp = buildSeaRamp(p, state.theme);
 
   const skyGrad = {
     id: "g-sky",
@@ -91,7 +93,7 @@ function renderHorizon(p, rng, state, palette, vp) {
 
   const motifPalette = horizonMotifPalette(palette, state.theme);
   const motifName = rng.weighted([
-    { value: "sun-moon", weight: 3 },
+    { value: "sun-moon", weight: 4 },
     { value: "pequod", weight: 3 },
     { value: "whale-fluke", weight: 2 },
     { value: "whaleboat", weight: 2 },
@@ -100,9 +102,9 @@ function renderHorizon(p, rng, state, palette, vp) {
 
   const minDim = Math.min(vp.w, vp.h);
   const motifSize = motifName === "sun-moon"
-    ? rng.range(0.12, 0.2) * minDim
-    : rng.range(0.08, 0.14) * minDim;
-  const motifX = rng.range(0.2, 0.8) * vp.w - motifSize / 2;
+    ? rng.range(0.16, 0.24) * minDim
+    : rng.range(0.1, 0.16) * minDim;
+  const motifX = vp.w / 2 - motifSize / 2;
   let motifY;
   if (motifName === "sun-moon") {
     motifY = horizonY - motifSize * 0.65;
@@ -132,16 +134,12 @@ function renderHorizon(p, rng, state, palette, vp) {
   };
 }
 
-// silhouette: rich gradient base with one large dark motif (or accent
-// motif) anchored on rule-of-thirds. Cinematic.
+// silhouette: a centred radial gradient with one large motif at the
+// geometric centre. Cinematic, iconic.
 function renderSilhouette(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
-  const direction = rng.weighted([
-    { value: "vertical", weight: 3 },
-    { value: "diagonal", weight: 2 },
-    { value: "radial", weight: 2 },
-  ]);
-  const grad = buildGradient("g-base", direction, ramp, vp, rng);
+  // Force radial direction so the gradient grows outward from centre.
+  const grad = buildGradient("g-base", "radial", ramp, vp, rng);
 
   const shapes = [
     { type: "rect", x: 0, y: 0, w: vp.w, h: vp.h, fill: `url(#${grad.id})` },
@@ -150,10 +148,9 @@ function renderSilhouette(p, rng, state, palette, vp) {
   const motifName = rng.pick(MOTIF_NAMES);
   const minDim = Math.min(vp.w, vp.h);
   const size = rng.range(0.42, 0.6) * minDim;
-  const cx = rng.pick(THIRDS) * vp.w;
-  const cy = rng.pick(THIRDS) * vp.h;
+  const cx = vp.w / 2;
+  const cy = vp.h / 2;
   const fill = silhouetteFill(p, palette, state.theme);
-  const rotate = rng.next() > 0.85 ? rng.range(-6, 6) : 0;
 
   return {
     shapes,
@@ -164,7 +161,7 @@ function renderSilhouette(p, rng, state, palette, vp) {
         x: cx - size / 2,
         y: cy - size / 2,
         size,
-        rotate,
+        rotate: 0,
         fill,
         shadow: state.theme === "light",
       },
@@ -174,71 +171,78 @@ function renderSilhouette(p, rng, state, palette, vp) {
   };
 }
 
-// departing: a moody gradient (often single-direction) with one
-// small motif near an edge, suggesting movement out of frame.
-function renderDeparting(p, rng, state, palette, vp) {
+// beacon: a small centred motif surrounded by concentric soft rings
+// emanating outward, like a stamp or a mark on parchment. The motif
+// is the focal point; the rings are the atmosphere.
+function renderBeacon(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
-  const direction = rng.weighted([
-    { value: "diagonal", weight: 3 },
-    { value: "horizontal", weight: 2 },
-    { value: "vertical", weight: 1 },
-  ]);
-  const grad = buildGradient("g-base", direction, ramp, vp, rng);
+  const baseGrad = buildGradient("g-base", "radial", ramp, vp, rng);
+  baseGrad.r = Math.max(vp.w, vp.h) * 1.05;
 
   const shapes = [
-    { type: "rect", x: 0, y: 0, w: vp.w, h: vp.h, fill: `url(#${grad.id})` },
+    { type: "rect", x: 0, y: 0, w: vp.w, h: vp.h, fill: `url(#${baseGrad.id})` },
   ];
 
-  const motifName = rng.weighted([
-    { value: "pequod", weight: 3 },
-    { value: "whaleboat", weight: 3 },
-    { value: "whale-fluke", weight: 2 },
-    { value: "sperm-whale", weight: 1 },
-  ]);
+  const cx = vp.w / 2;
+  const cy = vp.h / 2;
   const minDim = Math.min(vp.w, vp.h);
-  const size = rng.range(0.1, 0.18) * minDim;
 
-  // Place toward an edge, leaving room "out of frame" in one direction.
-  const edge = rng.pick(["right", "left", "bottom-right", "bottom-left"]);
-  let cx, cy;
-  if (edge === "right") {
-    cx = rng.range(0.7, 0.85) * vp.w;
-    cy = rng.range(0.4, 0.65) * vp.h;
-  } else if (edge === "left") {
-    cx = rng.range(0.15, 0.3) * vp.w;
-    cy = rng.range(0.4, 0.65) * vp.h;
-  } else if (edge === "bottom-right") {
-    cx = rng.range(0.65, 0.85) * vp.w;
-    cy = rng.range(0.62, 0.78) * vp.h;
-  } else {
-    cx = rng.range(0.15, 0.35) * vp.w;
-    cy = rng.range(0.62, 0.78) * vp.h;
+  // 6 to 9 concentric rings, semi-transparent, growing outward. Each
+  // ring is a thin stroked circle that fades as it moves out.
+  const ringCount = rng.int(6, 9);
+  const accent = palette.accents[0]?.hex || palette.surface.hex;
+  const ringHex = state.theme === "light" ? "#0D2F42" : "#EAE1D7";
+  const innerR = rng.range(0.1, 0.14) * minDim;
+  const ringStep = rng.range(0.06, 0.085) * minDim;
+  for (let i = 0; i < ringCount; i++) {
+    const r = innerR + (i + 1) * ringStep;
+    const t = i / (ringCount - 1);
+    const op = 0.32 * (1 - 0.7 * t);
+    shapes.push({
+      type: "ring",
+      cx,
+      cy,
+      r,
+      stroke: i === 1 && rng.next() > 0.5 ? accent : ringHex,
+      strokeWidth: rng.range(0.0035, 0.006) * minDim,
+      strokeOpacity: op,
+      blend: "multiply",
+    });
   }
 
-  const fill = silhouetteFill(p, palette, state.theme);
+  // Centre motif. Pick something that reads well as a small icon.
+  const motifName = rng.weighted([
+    { value: "compass-rose", weight: 4 },
+    { value: "sun-moon", weight: 3 },
+    { value: "whale-fluke", weight: 2 },
+    { value: "pequod", weight: 1 },
+    { value: "sperm-whale", weight: 1 },
+  ]);
+  const motifSize = innerR * rng.range(1.4, 1.7);
+  const motifFill = silhouetteFill(p, palette, state.theme);
 
   return {
     shapes,
-    gradients: [grad],
+    gradients: [baseGrad],
     motifs: [
       {
         name: motifName,
-        x: cx - size / 2,
-        y: cy - size / 2,
-        size,
-        rotate: rng.range(-3, 3),
-        fill,
+        x: cx - motifSize / 2,
+        y: cy - motifSize / 2,
+        size: motifSize,
+        rotate: 0,
+        fill: motifFill,
         shadow: state.theme === "light",
       },
     ],
-    grain: { intensity: 0.09, freq: rng.range(0.85, 1.0) },
+    grain: { intensity: 0.08, freq: rng.range(0.85, 1.0) },
     vignette: { intensity: state.theme === "light" ? 0.16 : 0.24 },
   };
 }
 
-function buildSkyRamp(p, theme, rng) {
+function buildSkyRamp(p, theme) {
   const log = p.log;
-  const stops = theme === "light"
+  return theme === "light"
     ? [
         { offset: 0, color: log["50"] },
         { offset: 0.4, color: log["100"] },
@@ -251,12 +255,11 @@ function buildSkyRamp(p, theme, rng) {
         { offset: 0.8, color: log["800"] },
         { offset: 1.0, color: log["700"] },
       ];
-  return stops;
 }
 
-function buildSeaRamp(p, theme, rng) {
+function buildSeaRamp(p, theme) {
   const log = p.log;
-  const stops = theme === "light"
+  return theme === "light"
     ? [
         { offset: 0, color: log["300"] },
         { offset: 0.5, color: log["400"] },
@@ -267,16 +270,12 @@ function buildSeaRamp(p, theme, rng) {
         { offset: 0.5, color: log["800"] },
         { offset: 1.0, color: log["900"] },
       ];
-  return stops;
 }
 
 function horizonMotifPalette(palette, theme) {
   if (theme === "light") {
-    // Dark silhouette against bright sky: use the deepest available.
     return { fill: "#0D2F42", shadow: false };
   }
-  // Dark theme: motifs need to be lighter than the sea so they read.
-  // Use Log 100 or an accent dark variant.
   const accent = palette.accents[0]?.hex;
   return { fill: accent || "#EAE1D7", shadow: false };
 }
@@ -285,6 +284,5 @@ function silhouetteFill(p, palette, theme) {
   if (theme === "light") {
     return p.log["800"];
   }
-  // On dark theme, silhouette in cream or accent.
   return palette.accents[0]?.hex || p.log["100"];
 }

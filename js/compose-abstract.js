@@ -62,15 +62,15 @@ function renderSubstyle(p, rng, state, substyle, palette, vp) {
   }
 }
 
-// mist: a rich Pequod gradient with seven to nine stops and an
-// optional very-soft accent blob anchored on rule-of-thirds.
+// mist: a rich Pequod gradient that grows from the centre. Direction
+// is weighted heavily toward radial; the optional accent stain is
+// centred too.
 function renderMist(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
   const direction = rng.weighted([
-    { value: "vertical", weight: 3 },
-    { value: "diagonal", weight: 2 },
-    { value: "radial", weight: 2 },
-    { value: "horizontal", weight: 1 },
+    { value: "radial", weight: 5 },
+    { value: "vertical", weight: 2 },
+    { value: "diagonal", weight: 1 },
   ]);
   const grad = buildGradient("g-base", direction, ramp, vp, rng);
 
@@ -78,11 +78,11 @@ function renderMist(p, rng, state, palette, vp) {
     { type: "rect", x: 0, y: 0, w: vp.w, h: vp.h, fill: `url(#${grad.id})` },
   ];
 
-  // Optional very-soft accent stain (60-75% chance).
+  // Optional very-soft accent stain at the centre (60-75% chance).
   if (rng.next() > 0.3 && palette.accents.length > 0) {
     const accent = palette.accents[rng.int(0, palette.accents.length - 1)];
-    const cx = rng.pick(THIRDS) * vp.w;
-    const cy = rng.pick(THIRDS) * vp.h;
+    const cx = vp.w / 2;
+    const cy = vp.h / 2;
     const r = rng.range(0.22, 0.4) * Math.min(vp.w, vp.h);
     shapes.push({
       type: "circle",
@@ -201,23 +201,28 @@ function renderStrata(p, rng, state, palette, vp) {
   };
 }
 
-// ripple: concentric soft circles centred on a rule-of-thirds anchor,
+// ripple: concentric soft circles centred on the geometric centre,
 // each at slightly different opacity, over a gentle radial base.
 function renderRipple(p, rng, state, palette, vp) {
   const ramp = buildPaperRamp(p, state.theme, rng);
   const baseGrad = buildGradient("g-base", "radial", ramp, vp, rng);
+  // Override radial centre to the exact geometric centre so the ripple
+  // and the gradient share an origin.
+  baseGrad.cx = vp.w / 2;
+  baseGrad.cy = vp.h / 2;
+  baseGrad.r = Math.max(vp.w, vp.h) * 0.95;
 
   const shapes = [
     { type: "rect", x: 0, y: 0, w: vp.w, h: vp.h, fill: `url(#${baseGrad.id})` },
   ];
 
-  const cx = rng.pick(THIRDS) * vp.w;
-  const cy = rng.pick(THIRDS) * vp.h;
+  const cx = vp.w / 2;
+  const cy = vp.h / 2;
   const accent = palette.accents[0]?.hex;
   const swatches = swatchPool(p, palette, state.theme);
   const minDim = Math.min(vp.w, vp.h);
   const layers = rng.int(7, 12);
-  const maxR = rng.range(0.6, 0.95) * minDim;
+  const maxR = rng.range(0.7, 1.05) * minDim;
 
   for (let i = layers - 1; i >= 0; i--) {
     const t = i / (layers - 1);
@@ -274,8 +279,8 @@ export function buildGradient(id, direction, stops, vp, rng) {
     return {
       id,
       type: "radial",
-      cx: rng.pick(THIRDS) * vp.w,
-      cy: rng.pick(THIRDS) * vp.h,
+      cx: vp.w / 2,
+      cy: vp.h / 2,
       r: Math.max(vp.w, vp.h) * rng.range(0.85, 1.15),
       stops,
     };

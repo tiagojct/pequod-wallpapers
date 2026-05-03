@@ -318,6 +318,17 @@ function appendShape(parent, s, NS) {
     el.setAttribute("cy", s.cy);
     el.setAttribute("r", s.r);
     el.setAttribute("fill", s.fill);
+  } else if (s.type === "ring") {
+    el = document.createElementNS(NS, "circle");
+    el.setAttribute("cx", s.cx);
+    el.setAttribute("cy", s.cy);
+    el.setAttribute("r", s.r);
+    el.setAttribute("fill", "none");
+    el.setAttribute("stroke", s.stroke);
+    el.setAttribute("stroke-width", String(s.strokeWidth));
+    if (s.strokeOpacity !== undefined) {
+      el.setAttribute("stroke-opacity", String(s.strokeOpacity));
+    }
   } else if (s.type === "rect") {
     el = document.createElementNS(NS, "rect");
     el.setAttribute("x", s.x);
