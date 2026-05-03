@@ -158,11 +158,11 @@ function attachControls() {
 
   document.getElementById("more-toggle").addEventListener("click", () => {
     const adv = document.getElementById("advanced");
+    const btn = document.getElementById("more-toggle");
     const isHidden = adv.hidden;
     adv.hidden = !isHidden;
-    document.getElementById("more-toggle").textContent = isHidden
-      ? "less"
-      : "more";
+    btn.textContent = isHidden ? "less" : "more";
+    btn.setAttribute("aria-expanded", String(!isHidden));
   });
 
   document.getElementById("copy-seed").addEventListener("click", async () => {
@@ -314,6 +314,7 @@ async function openGallery() {
   for (const e of entries) {
     const fig = document.createElement("figure");
     fig.className = "gallery-item";
+    fig.style.aspectRatio = e.aspectW && e.aspectH ? `${e.aspectW} / ${e.aspectH}` : "16 / 10";
     const img = document.createElement("img");
     img.src = e.thumbnail;
     img.alt = `pequod wallpaper ${e.seed}`;

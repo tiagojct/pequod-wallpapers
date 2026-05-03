@@ -3,13 +3,12 @@
 // flats:
 //
 //   1. base surface fill (in case shapes do not cover everything)
-//   2. <defs>: filters (grain, soft-blur, motif-shadow, feather) and
+//   2. <defs>: filters (grain, soft-blur, feather) and
 //      gradients declared by the composition
 //   3. shape group: composition.shapes (gradients-as-fills, blends,
 //      blurs, feathered bands)
-//   4. motif group: composition.motifs (with optional drop shadow)
-//   5. paper-grain wash (turbulence noise, multiply blend, low alpha)
-//   6. vignette (radial gradient overlay, very subtle)
+//   4. paper-grain wash (turbulence noise, multiply blend, low alpha)
+//   5. vignette (radial gradient overlay, very subtle)
 
 import { rgba, cyrb53OrZero } from "./palette.js";
 
@@ -22,7 +21,7 @@ export function viewportFor(aspectW, aspectH) {
 }
 
 export function buildSVG(composition, options) {
-  const { aspectW, aspectH, watermark, seed, motifsCache } = options;
+  const { aspectW, aspectH, watermark, seed } = options;
   const NS = "http://www.w3.org/2000/svg";
   const { w: vbW, h: vbH } = viewportFor(aspectW, aspectH);
 
@@ -56,44 +55,6 @@ export function buildSVG(composition, options) {
   const noiseSeed = (cyrb53OrZero(seed || "") % 1000) >>> 0;
   const grainConfig = composition.grain || { intensity: 0.1, freq: 0.95 };
   defs.appendChild(buildGrainFilter(NS, "grain", noiseSeed, grainConfig.freq));
-
-  // Motif drop shadow: very soft, slightly offset.
-  defs.appendChild(makeFilter(NS, "motif-shadow", -0.2, 1.4, [
-    (() => {
-      const blur = document.createElementNS(NS, "feGaussianBlur");
-      blur.setAttribute("in", "SourceAlpha");
-      blur.setAttribute("stdDeviation", String(Math.min(vbW, vbH) * 0.008));
-      return blur;
-    })(),
-    (() => {
-      const offset = document.createElementNS(NS, "feOffset");
-      offset.setAttribute("dx", String(Math.min(vbW, vbH) * 0.004));
-      offset.setAttribute("dy", String(Math.min(vbW, vbH) * 0.006));
-      offset.setAttribute("result", "offsetBlur");
-      return offset;
-    })(),
-    (() => {
-      const flood = document.createElementNS(NS, "feFlood");
-      flood.setAttribute("flood-color", "#000000");
-      flood.setAttribute("flood-opacity", "0.28");
-      return flood;
-    })(),
-    (() => {
-      const composite = document.createElementNS(NS, "feComposite");
-      composite.setAttribute("in2", "offsetBlur");
-      composite.setAttribute("operator", "in");
-      return composite;
-    })(),
-    (() => {
-      const merge = document.createElementNS(NS, "feMerge");
-      const m1 = document.createElementNS(NS, "feMergeNode");
-      const m2 = document.createElementNS(NS, "feMergeNode");
-      m2.setAttribute("in", "SourceGraphic");
-      merge.appendChild(m1);
-      merge.appendChild(m2);
-      return merge;
-    })(),
-  ]));
 
   // Per-shape blur filters and gradients declared by the composition.
   let blurCounter = 0;

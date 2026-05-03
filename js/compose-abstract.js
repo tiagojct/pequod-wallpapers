@@ -115,8 +115,9 @@ function renderMist(p, rng, state, palette, chord, vp) {
   const grad = buildGradient("g-base", direction, ramp, vp, rng);
   const shapes = [baseRect(vp, `url(#${grad.id})`)];
 
-  // 50% chance of a single soft accent stain at the centre.
-  if (rng.next() > 0.5) {
+  // Stain probability scales with density.
+  const stainProb = state.density === "low" ? 0.35 : state.density === "high" ? 0.65 : 0.5;
+  if (rng.next() < stainProb) {
     const r = rng.range(0.28, 0.45) * Math.min(vp.w, vp.h);
     shapes.push({
       type: "circle",
@@ -149,7 +150,7 @@ function renderRipple(p, rng, state, palette, chord, vp) {
   const cx = vp.w / 2;
   const cy = vp.h / 2;
   const minDim = Math.min(vp.w, vp.h);
-  const layers = rng.int(7, 10);
+  const layers = densityInt(rng, state.density, 7, 10);
   const maxR = rng.range(0.85, 1.1) * minDim;
 
   for (let i = layers - 1; i >= 0; i--) {
@@ -171,7 +172,7 @@ function renderRipple(p, rng, state, palette, chord, vp) {
 
   // Orbital dots: 4-6 around the centre, on a single ring.
   const orbitR = maxR * rng.range(0.6, 0.78);
-  const orbitCount = rng.int(4, 6);
+  const orbitCount = densityInt(rng, state.density, 4, 6);
   for (let i = 0; i < orbitCount; i++) {
     const angle = (i / orbitCount) * Math.PI * 2 + rng.range(-0.15, 0.15);
     const dx = cx + Math.cos(angle) * orbitR;
@@ -227,7 +228,7 @@ function renderConstellation(p, rng, state, palette, chord, vp) {
   }
 
   // 5-8 marks of varied types arranged around the blob with min-spacing.
-  const markCount = rng.int(5, 8);
+  const markCount = densityInt(rng, state.density, 5, 8);
   scatterMarks(shapes, rng, chord, markCount, vp, { cx, cy, blobR });
 
   // 50% chance of a hero gesture line crossing.
@@ -280,7 +281,7 @@ function renderLunar(p, rng, state, palette, chord, vp) {
   });
 
   // 3-4 stars arranged on a wider ring.
-  const starCount = rng.int(3, 4);
+  const starCount = densityInt(rng, state.density, 3, 4);
   const starPositions = arrangeAround(cx, cy, outerR * 2.7, starCount, rng);
   for (const pos of starPositions) {
     pushMark(
@@ -337,7 +338,7 @@ function renderGesture(p, rng, state, palette, chord, vp) {
   pushSnake(shapes, vp, rng, snakeHex, 1.0, 0.014 * minDim);
 
   // 4-6 supporting marks scattered freeform.
-  const markCount = rng.int(4, 6);
+  const markCount = densityInt(rng, state.density, 4, 6);
   const positions = arrangeFreeform(rng, markCount, vp, minDim * 0.18);
   for (const pos of positions) {
     const t = rng.weighted([
@@ -414,6 +415,10 @@ function pushMark(shapes, type, x, y, size, fill, rng) {
       const rx = size * 0.55;
       const ry = size * 0.3;
       const rot = rng.next() > 0.5 ? 0 : 90;
+      const h = fill.replace("#", "");
+      const luma = (parseInt(h.slice(0, 2), 16) * 299
+                  + parseInt(h.slice(2, 4), 16) * 587
+                  + parseInt(h.slice(4, 6), 16) * 114) / 1000;
       shapes.push({
         type: "path",
         d: buildEllipsePath(x, y, rx, ry, rot),
@@ -424,7 +429,7 @@ function pushMark(shapes, type, x, y, size, fill, rng) {
         cx: x,
         cy: y,
         r: ry * 0.55,
-        fill: fill === "#0D2F42" ? "#EAE1D7" : "#0D2F42",
+        fill: luma > 128 ? "#0B1720" : "#F7F3EE",
         fillOpacity: 0.85,
       });
       break;
@@ -696,6 +701,12 @@ function defaultGrain(rng) {
 
 function defaultVignette(theme) {
   return { intensity: theme === "light" ? 0.12 : 0.18 };
+}
+
+function densityInt(rng, density, lo, hi) {
+  if (density === "low") return rng.int(Math.max(lo - 1, 1), Math.max(hi - 1, lo));
+  if (density === "high") return rng.int(lo + 1, hi + 1);
+  return rng.int(lo, hi);
 }
 
 function clamp(v, lo, hi) {

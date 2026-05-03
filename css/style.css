@@ -392,8 +392,8 @@ button.icon-btn {
 .gallery-item img {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain;
   background: var(--bg);
 }
 

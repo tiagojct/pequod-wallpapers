@@ -1,7 +1,7 @@
 // Encodes and decodes the full generation state in the query string.
 // Schema is documented in README.md and CLAUDE.md.
 
-const VALID_MODES = new Set(["abstract", "maritime"]);
+const VALID_MODES = new Set(["abstract"]);
 const VALID_THEMES = new Set(["light", "dark"]);
 const VALID_DENSITIES = new Set(["low", "medium", "high"]);
 const VALID_ACCENTS = new Set([
