@@ -1,15 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Whale fluke breaking water (placeholder). -->
-  <!-- Tail stalk -->
-  <path d="M 47 70 Q 48 60 50 50 Q 52 60 53 70 Z" />
-  <!-- Fluke -->
-  <path d="M 50 50
-           Q 30 32 20 36
-           Q 28 42 38 46
-           Q 50 50 62 46
-           Q 72 42 80 36
-           Q 70 32 50 50 Z" />
-  <!-- Ripple lines below -->
-  <path d="M 18 80 Q 30 76 42 80 Q 54 84 66 80 Q 78 76 90 80 L 90 84 Q 78 80 66 84 Q 54 88 42 84 Q 30 80 18 84 Z" />
-  <path d="M 26 90 Q 38 87 50 90 Q 62 93 74 90 L 74 93 Q 62 90 50 93 Q 38 96 26 93 Z" />
+  <!-- Whale fluke breaking water as the animal sounds. Two flukes
+       meeting at a central notch, the peduncle disappearing into the
+       water, and a few splash lines around the entry point. The
+       composition occupies the upper two-thirds; the lower third is
+       reserved for water disturbance. -->
+  <!-- Right fluke: concave trailing edge, sharp tip -->
+  <path d="M 50 38
+           Q 56 30 68 22
+           Q 76 18 82 18
+           Q 80 24 76 30
+           Q 70 36 60 42
+           Q 54 44 50 44 Z" />
+  <!-- Left fluke: mirror, slightly different proportions -->
+  <path d="M 50 38
+           Q 44 30 32 22
+           Q 24 18 18 18
+           Q 20 24 24 30
+           Q 30 36 40 42
+           Q 46 44 50 44 Z" />
+  <!-- Central notch and peduncle (the stalk emerging from water) -->
+  <path d="M 47 44
+           Q 49 50 49 60
+           L 51 60
+           Q 51 50 53 44 Z" />
+  <!-- Water entry: a wider darker shape under the peduncle -->
+  <ellipse cx="50" cy="62" rx="6" ry="1.6" />
+  <!-- Splash lines: ripples and droplets around the entry -->
+  <path d="M 22 70 Q 34 66 46 70 Q 54 72 64 70 Q 76 66 88 70 L 88 72 Q 76 68 64 72 Q 54 74 46 72 Q 34 68 22 72 Z" />
+  <path d="M 30 80 Q 40 77 50 80 Q 60 83 70 80 L 70 82 Q 60 80 50 82 Q 40 84 30 82 Z" />
+  <!-- A few droplets above the water line -->
+  <circle cx="38" cy="56" r="1.2" />
+  <circle cx="64" cy="58" r="0.9" />
+  <circle cx="56" cy="52" r="0.7" />
+  <circle cx="42" cy="50" r="0.5" />
 </svg>

@@ -33,12 +33,16 @@ export async function loadAllMotifs() {
 }
 
 // Clone a motif and apply a fill colour to every fillable element.
+// Elements that carry a fill-opacity are treated as translucent
+// highlights (whale eye, sun craters, compass inner ring) and keep
+// their original fill so they read as negative-space hints inside
+// the silhouette.
 export function cloneMotif(svgElement, fill) {
   const clone = svgElement.cloneNode(true);
-  // Apply fill to the root and to descendants that have no inline fill.
   clone.setAttribute("fill", fill);
   const all = clone.querySelectorAll("path, polygon, rect, circle, ellipse");
   all.forEach((el) => {
+    if (el.hasAttribute("fill-opacity")) return;
     el.setAttribute("fill", fill);
     el.removeAttribute("stroke");
   });
