@@ -6,7 +6,9 @@ the [Pequod palette](https://tiagojct.eu/projects/pequod). Two modes
 optional Moby-Dick chapter epigraph, PNG and SVG export, and an
 in-browser gallery.
 
-Live at: https://tiagojct.github.io/pequod-wallpapers/
+Live at: https://tiagojct.eu/pequod-wallpapers/
+
+![pequod-wallpapers running in light theme, abstract mode, showing a constellation composition with a dark biomorphic blob, scattered asterisk marks, and a thin sinuous curve on a warm Log 100 surface.](screenshot.png)
 
 ## What it does
 
