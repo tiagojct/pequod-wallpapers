@@ -3,6 +3,8 @@
 import { makeRng, newSeed, isValidSeed } from "./prng.js";
 import { loadPalette } from "./palette.js";
 import { composeAbstract } from "./compose-abstract.js";
+import { composeMaritime } from "./compose-maritime.js";
+import { loadChapters, pickChapter, buildEpigraphShape } from "./epigraph.js";
 import { buildSVG, viewportFor } from "./render.js";
 import { exportPNG, exportSVG, makeFilename, thumbnailDataURL } from "./export.js";
 import { saveEntry, listEntries, deleteEntry, exportGalleryJSON } from "./gallery.js";
@@ -37,12 +39,14 @@ const ALL_ACCENTS = [
 const PNG_LONG_SIDE = 2880;
 
 let palette = null;
+let chapters = null;
 let state = { ...DEFAULT_STATE };
 let lastSVG = null;
 let lastComposition = null;
 
 async function init() {
   palette = await loadPalette();
+  chapters = await loadChapters();
 
   const fromURL = readStateFromURL();
   state = { ...DEFAULT_STATE, ...fromURL };
@@ -106,6 +110,14 @@ function attachControls() {
   document.getElementById("regenerate").addEventListener("click", () => {
     regenerate({});
   });
+
+  // Mode toggle (abstract / maritime).
+  for (const btn of document.querySelectorAll("#mode-toggle button")) {
+    btn.addEventListener("click", () => {
+      setMode(btn.dataset.mode);
+    });
+  }
+
   document.getElementById("theme").addEventListener("change", (e) => {
     state.theme = e.target.value;
     applyAppTheme();
@@ -155,15 +167,14 @@ function attachControls() {
     rerender();
     writeStateToURL(state, true);
   });
-
-  document.getElementById("more-toggle").addEventListener("click", () => {
-    const adv = document.getElementById("advanced");
-    const btn = document.getElementById("more-toggle");
-    const isHidden = adv.hidden;
-    adv.hidden = !isHidden;
-    btn.textContent = isHidden ? "less" : "more";
-    btn.setAttribute("aria-expanded", String(!isHidden));
+  document.getElementById("epigraph").addEventListener("change", (e) => {
+    state.epigraph = e.target.checked;
+    rerender();
+    writeStateToURL(state, true);
   });
+
+  document.getElementById("more-toggle").addEventListener("click", () => openPanel(true));
+  document.getElementById("close-panel").addEventListener("click", () => openPanel(false));
 
   document.getElementById("copy-seed").addEventListener("click", async () => {
     await navigator.clipboard.writeText(state.seed);
@@ -186,24 +197,7 @@ function attachControls() {
     exportSVG(lastSVG, makeFilename(state, "svg"));
     flashStatus("svg saved");
   });
-  document.getElementById("save").addEventListener("click", async () => {
-    if (!lastSVG) return;
-    const thumb = await thumbnailDataURL(lastSVG, 256);
-    await saveEntry({
-      seed: state.seed,
-      mode: state.mode,
-      theme: state.theme,
-      aspectW: state.aspectW,
-      aspectH: state.aspectH,
-      density: state.density,
-      accentCount: state.accentCount,
-      accents: state.accents,
-      watermark: state.watermark,
-      substyle: lastComposition?.substyle,
-      thumbnail: thumb,
-    });
-    flashStatus("saved to gallery");
-  });
+  document.getElementById("save").addEventListener("click", saveCurrentEntry);
   document.getElementById("gallery").addEventListener("click", openGallery);
   document.getElementById("close-gallery").addEventListener("click", closeGallery);
   document.getElementById("export-gallery").addEventListener("click", async () => {
@@ -216,9 +210,97 @@ function attachControls() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   });
+
+  document.addEventListener("keydown", onGlobalKeydown);
+}
+
+function setMode(mode) {
+  if (mode !== "abstract" && mode !== "maritime") return;
+  if (state.mode === mode) return;
+  state.mode = mode;
+  syncModeToggle();
+  regenerate({});
+}
+
+function syncModeToggle() {
+  for (const btn of document.querySelectorAll("#mode-toggle button")) {
+    btn.setAttribute("aria-selected", String(btn.dataset.mode === state.mode));
+  }
+}
+
+function openPanel(open) {
+  const panel = document.getElementById("panel");
+  const more = document.getElementById("more-toggle");
+  panel.hidden = !open;
+  more.setAttribute("aria-expanded", String(open));
+}
+
+async function saveCurrentEntry() {
+  if (!lastSVG) return;
+  const thumb = await thumbnailDataURL(lastSVG, 256);
+  const kind = lastComposition?.kind || lastComposition?.substyle;
+  await saveEntry({
+    seed: state.seed,
+    mode: state.mode,
+    theme: state.theme,
+    aspectW: state.aspectW,
+    aspectH: state.aspectH,
+    density: state.density,
+    accentCount: state.accentCount,
+    accents: state.accents,
+    watermark: state.watermark,
+    epigraph: state.epigraph,
+    kind,
+    substyle: kind,
+    thumbnail: thumb,
+  });
+  flashStatus("saved to gallery");
+}
+
+function onGlobalKeydown(e) {
+  // Don't steal keys while the user is typing in a form field.
+  const tag = (e.target?.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  switch (e.key) {
+    case " ":
+    case "Spacebar":
+      e.preventDefault();
+      regenerate({});
+      break;
+    case "m":
+      setMode(state.mode === "abstract" ? "maritime" : "abstract");
+      break;
+    case "t":
+      state.theme = state.theme === "light" ? "dark" : "light";
+      document.getElementById("theme").value = state.theme;
+      applyAppTheme();
+      regenerate({ keepSeed: true });
+      break;
+    case "s":
+      saveCurrentEntry();
+      break;
+    case "e":
+      document.getElementById("export-png").click();
+      break;
+    case "g": {
+      const open = !document.getElementById("gallery-drawer").hidden;
+      if (open) closeGallery(); else openGallery();
+      break;
+    }
+    case "Escape":
+      if (!document.getElementById("gallery-drawer").hidden) {
+        closeGallery();
+      } else if (!document.getElementById("panel").hidden) {
+        openPanel(false);
+      }
+      break;
+  }
 }
 
 function syncControlsFromState() {
+  syncModeToggle();
   document.getElementById("theme").value = state.theme;
   const presetKey = matchAspect(state.aspectW, state.aspectH);
   if (presetKey) {
@@ -234,6 +316,7 @@ function syncControlsFromState() {
   document.getElementById("count").value = String(state.accentCount);
   document.getElementById("seed").value = state.seed;
   document.getElementById("watermark").checked = !!state.watermark;
+  document.getElementById("epigraph").checked = !!state.epigraph;
   // Accent lock checkboxes
   for (const name of ALL_ACCENTS) {
     const cb = document.getElementById(`lock-${name}`);
@@ -257,7 +340,8 @@ function regenerate({ keepSeed = false, replaceURL = false } = {}) {
   if (!keepSeed) state.seed = newSeed();
   const rng = makeRng(state.seed);
   const vp = viewportFor(state.aspectW, state.aspectH);
-  const composition = composeAbstract(palette, rng, state, vp);
+  const compose = state.mode === "maritime" ? composeMaritime : composeAbstract;
+  const composition = compose(palette, rng, state, vp);
   lastComposition = composition;
   rerender();
   document.getElementById("seed").value = state.seed;
@@ -266,11 +350,18 @@ function regenerate({ keepSeed = false, replaceURL = false } = {}) {
 
 function rerender() {
   if (!lastComposition) return;
+  let epigraphShape = null;
+  if (state.epigraph && chapters && lastComposition.chord) {
+    const ch = pickChapter(chapters, state.seed);
+    const vp = viewportFor(state.aspectW, state.aspectH);
+    epigraphShape = buildEpigraphShape(ch, vp, lastComposition.chord, state.theme);
+  }
   const { svg } = buildSVG(lastComposition, {
     aspectW: state.aspectW,
     aspectH: state.aspectH,
     watermark: state.watermark,
     seed: state.seed,
+    epigraph: epigraphShape,
   });
   const stage = document.getElementById("stage");
   stage.innerHTML = "";
@@ -323,7 +414,8 @@ async function openGallery() {
       closeGallery();
     });
     const cap = document.createElement("figcaption");
-    cap.textContent = `${e.seed} . ${e.mode} . ${e.theme}`;
+    const kind = e.kind || e.substyle || "-";
+    cap.textContent = `${e.seed} . ${e.mode}/${kind} . ${e.theme}`;
     const del = document.createElement("button");
     del.className = "icon-btn";
     del.setAttribute("aria-label", "delete");
@@ -348,7 +440,7 @@ function closeGallery() {
 function restoreEntry(e) {
   state = {
     ...DEFAULT_STATE,
-    mode: e.mode,
+    mode: e.mode === "maritime" ? "maritime" : "abstract",
     theme: e.theme,
     aspectW: e.aspectW,
     aspectH: e.aspectH,
@@ -357,6 +449,7 @@ function restoreEntry(e) {
     accents: e.accents || [],
     seed: e.seed,
     watermark: !!e.watermark,
+    epigraph: !!e.epigraph,
   };
   syncControlsFromState();
   applyAppTheme();

@@ -21,7 +21,7 @@ export function viewportFor(aspectW, aspectH) {
 }
 
 export function buildSVG(composition, options) {
-  const { aspectW, aspectH, watermark, seed } = options;
+  const { aspectW, aspectH, watermark, seed, epigraph } = options;
   const NS = "http://www.w3.org/2000/svg";
   const { w: vbW, h: vbH } = viewportFor(aspectW, aspectH);
 
@@ -116,6 +116,12 @@ export function buildSVG(composition, options) {
   vignetteRect.setAttribute("fill", "url(#g-vignette)");
   vignetteRect.setAttribute("style", "mix-blend-mode: multiply");
   svg.appendChild(vignetteRect);
+
+  // Epigraph (chapter title) sits above the vignette but below the
+  // watermark so the watermark always remains a corner stamp.
+  if (epigraph) {
+    appendText(svg, epigraph, NS);
+  }
 
   // Watermark stays on top of everything.
   if (watermark) {
@@ -245,6 +251,22 @@ function buildGradientNode(g, NS) {
     el.appendChild(stop);
   }
   return el;
+}
+
+function appendText(parent, t, NS) {
+  const el = document.createElementNS(NS, "text");
+  el.textContent = t.content;
+  el.setAttribute("x", String(t.x));
+  el.setAttribute("y", String(t.y));
+  el.setAttribute("fill", t.fill);
+  if (t.fillOpacity !== undefined) el.setAttribute("fill-opacity", String(t.fillOpacity));
+  el.setAttribute("font-family", t.family);
+  el.setAttribute("font-size", String(t.size));
+  if (t.weight !== undefined) el.setAttribute("font-weight", String(t.weight));
+  if (t.style) el.setAttribute("font-style", t.style);
+  if (t.anchor) el.setAttribute("text-anchor", t.anchor);
+  if (t.letterSpacing !== undefined) el.setAttribute("letter-spacing", String(t.letterSpacing));
+  parent.appendChild(el);
 }
 
 function appendShape(parent, s, NS) {

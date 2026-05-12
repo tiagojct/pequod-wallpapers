@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>pequod-wallpapers</title>
-    <meta name="description" content="A wallpaper generator built on the Pequod palette. Two modes (abstract, maritime), two themes (light, dark), seed-reproducible output, PNG and SVG export." />
+    <meta name="description" content="A wallpaper generator built on the Pequod palette. Two modes (abstract with three named sub-styles, maritime with six named scenes), light and dark themes, seed-reproducible output, optional Moby-Dick chapter epigraph, PNG and SVG export." />
     <link rel="icon" href="data:," />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -15,109 +15,132 @@
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body data-theme="light">
-    <header class="topbar">
-      <h1>pequod-wallpapers</h1>
-      <p class="tagline">a wallpaper generator built on the Pequod palette</p>
+    <main class="stage-wrap" aria-label="wallpaper preview">
+      <div id="stage" class="stage" role="img" aria-label="current wallpaper"></div>
+    </main>
+
+    <header class="toolbar toolbar-top" aria-label="brand and mode">
+      <h1 class="brand">pequod-wallpapers</h1>
+      <div id="mode-toggle" class="mode-toggle" role="tablist" aria-label="composition mode">
+        <button id="mode-abstract" role="tab" aria-selected="true" data-mode="abstract">abstract</button>
+        <button id="mode-maritime" role="tab" aria-selected="false" data-mode="maritime">maritime</button>
+      </div>
     </header>
 
-    <main class="layout">
-      <aside class="controls" aria-label="generation controls">
-        <div class="control">
-          <label for="theme">theme</label>
+    <footer class="toolbar toolbar-bottom" aria-label="actions and settings">
+      <button id="regenerate" class="primary" aria-label="generate a new wallpaper">regenerate</button>
+
+      <div class="group">
+        <label class="inline-control">
+          <span>theme</span>
           <select id="theme">
             <option value="light">light</option>
             <option value="dark">dark</option>
           </select>
-        </div>
-
-        <div class="control">
-          <label for="aspect">aspect ratio</label>
+        </label>
+        <label class="inline-control">
+          <span>aspect</span>
           <select id="aspect">
             <option value="16x10">16:10</option>
             <option value="16x9">16:9</option>
             <option value="21x9">21:9</option>
             <option value="4x3">4:3</option>
-            <option value="19x9">19.5:9 (phone landscape)</option>
-            <option value="9x19">9:19.5 (phone portrait)</option>
+            <option value="19x9">19.5:9 phone landscape</option>
+            <option value="9x19">9:19.5 phone portrait</option>
             <option value="1x1">1:1</option>
             <option value="custom">custom</option>
           </select>
-          <div id="custom-aspect" class="custom-aspect" hidden>
-            <input id="custom-w" type="number" min="1" max="16384" value="16" aria-label="custom width" />
-            <span aria-hidden="true">x</span>
-            <input id="custom-h" type="number" min="1" max="16384" value="10" aria-label="custom height" />
-          </div>
+        </label>
+        <div id="custom-aspect" class="custom-aspect" hidden>
+          <input id="custom-w" type="number" min="1" max="16384" value="16" aria-label="custom width" />
+          <span aria-hidden="true">x</span>
+          <input id="custom-h" type="number" min="1" max="16384" value="10" aria-label="custom height" />
         </div>
-
-        <button id="more-toggle" class="link-btn" aria-expanded="false">more</button>
-
-        <div id="advanced" class="advanced" hidden>
-          <div class="control">
-            <label for="density">density</label>
-            <select id="density">
-              <option value="low">low</option>
-              <option value="medium" selected>medium</option>
-              <option value="high">high</option>
-            </select>
-          </div>
-
-          <div class="control">
-            <label for="count">accent count</label>
-            <select id="count">
-              <option value="1">1</option>
-              <option value="2" selected>2</option>
-              <option value="3">3</option>
-            </select>
-          </div>
-
-          <fieldset class="control">
-            <legend>accent lock (optional)</legend>
-            <div id="accent-lock" class="accent-lock"></div>
-          </fieldset>
-
-          <div class="control">
-            <label for="seed">seed</label>
-            <input id="seed" type="text" spellcheck="false" autocomplete="off" />
-          </div>
-
-          <div class="control">
-            <label class="checkbox-row">
-              <input id="watermark" type="checkbox" />
-              <span>watermark</span>
-            </label>
-          </div>
-        </div>
-      </aside>
-
-      <section class="preview" aria-label="wallpaper preview">
-        <div id="stage" class="stage" role="img" aria-label="current wallpaper"></div>
-      </section>
-    </main>
-
-    <footer class="actions" aria-label="actions">
-      <div class="left">
-        <button id="regenerate" class="primary" aria-label="generate a new wallpaper">regenerate</button>
-        <span id="status" class="status" aria-live="polite"></span>
+        <button id="more-toggle" aria-expanded="false" aria-controls="panel">more</button>
       </div>
-      <div class="right">
-        <button id="copy-seed">copy seed</button>
-        <button id="copy-url">copy share url</button>
-        <button id="export-png">export png</button>
-        <button id="export-svg">export svg</button>
-        <button id="save">save</button>
-        <button id="gallery">gallery</button>
+
+      <div class="spacer"></div>
+
+      <div class="group group-end">
+        <button id="copy-seed" title="copy seed (keyboard: c)">seed</button>
+        <button id="copy-url" title="copy share URL">share</button>
+        <button id="export-png" title="export PNG (keyboard: e)">png</button>
+        <button id="export-svg" title="export SVG">svg</button>
+        <button id="save" title="save to gallery (keyboard: s)">save</button>
+        <button id="gallery" title="open gallery (keyboard: g)">gallery</button>
       </div>
+
+      <span id="status" class="status" aria-live="polite"></span>
     </footer>
 
+    <aside id="panel" class="panel" hidden aria-label="advanced controls">
+      <header class="panel-bar">
+        <h2>controls</h2>
+        <button id="close-panel" class="ghost" aria-label="close advanced">close</button>
+      </header>
+
+      <div class="control">
+        <label for="density">density</label>
+        <select id="density">
+          <option value="low">low</option>
+          <option value="medium" selected>medium</option>
+          <option value="high">high</option>
+        </select>
+        <p class="help">how many supporting marks the composition includes.</p>
+      </div>
+
+      <div class="control">
+        <label for="count">accent count</label>
+        <select id="count">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+        </select>
+        <p class="help">how many crew accents the chord can use.</p>
+      </div>
+
+      <fieldset class="control">
+        <legend>accent lock</legend>
+        <div id="accent-lock" class="accent-lock"></div>
+        <p class="help">tick to restrict accents to specific crew. leave empty for any.</p>
+      </fieldset>
+
+      <div class="control">
+        <label for="seed">seed</label>
+        <input id="seed" type="text" spellcheck="false" autocomplete="off" />
+        <p class="help">PEQUOD- plus four base36 characters. paste to reproduce a composition.</p>
+      </div>
+
+      <div class="control">
+        <label class="checkbox-row">
+          <input id="watermark" type="checkbox" />
+          <span>watermark</span>
+        </label>
+        <p class="help">stamp the seed in a corner of the exported image.</p>
+      </div>
+
+      <div class="control">
+        <label class="checkbox-row">
+          <input id="epigraph" type="checkbox" />
+          <span>chapter epigraph</span>
+        </label>
+        <p class="help">add a Moby-Dick chapter title in italic serif. seeded.</p>
+      </div>
+    </aside>
+
     <div id="gallery-drawer" class="gallery-drawer" hidden>
-      <div class="gallery-bar">
+      <header class="gallery-bar">
         <h2>gallery</h2>
         <span id="gallery-count" class="muted"></span>
         <div class="spacer"></div>
         <button id="export-gallery">export json</button>
         <button id="close-gallery" aria-label="close gallery">close</button>
-      </div>
+      </header>
       <div id="gallery-grid" class="gallery-grid"></div>
+    </div>
+
+    <div class="keyboard-hint" aria-hidden="true">
+      <kbd>space</kbd> regenerate &nbsp; <kbd>m</kbd> mode &nbsp; <kbd>t</kbd> theme &nbsp; <kbd>s</kbd> save &nbsp; <kbd>e</kbd> export png &nbsp; <kbd>g</kbd> gallery
     </div>
 
     <script type="module" src="js/main.js"></script>

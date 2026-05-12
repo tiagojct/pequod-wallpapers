@@ -1,7 +1,7 @@
 // Encodes and decodes the full generation state in the query string.
 // Schema is documented in README.md and CLAUDE.md.
 
-const VALID_MODES = new Set(["abstract"]);
+const VALID_MODES = new Set(["abstract", "maritime"]);
 const VALID_THEMES = new Set(["light", "dark"]);
 const VALID_DENSITIES = new Set(["low", "medium", "high"]);
 const VALID_ACCENTS = new Set([
@@ -31,6 +31,7 @@ export const DEFAULT_STATE = {
   accents: [],
   seed: "",
   watermark: false,
+  epigraph: false,
 };
 
 export function readStateFromURL() {
@@ -90,10 +91,13 @@ export function readStateFromURL() {
   const wm = params.get("wm");
   if (wm === "1") out.watermark = true;
 
+  const epi = params.get("epi");
+  if (epi === "1") out.epigraph = true;
+
   return out;
 }
 
-export function writeStateToURL(state, replace = false) {
+function buildParams(state) {
   const p = new URLSearchParams();
   p.set("mode", state.mode);
   p.set("theme", state.theme);
@@ -105,8 +109,12 @@ export function writeStateToURL(state, replace = false) {
   }
   if (state.seed) p.set("seed", state.seed);
   if (state.watermark) p.set("wm", "1");
+  if (state.epigraph) p.set("epi", "1");
+  return p;
+}
 
-  const url = `${window.location.pathname}?${p.toString()}`;
+export function writeStateToURL(state, replace = false) {
+  const url = `${window.location.pathname}?${buildParams(state).toString()}`;
   if (replace) {
     history.replaceState(null, "", url);
   } else {
@@ -115,16 +123,5 @@ export function writeStateToURL(state, replace = false) {
 }
 
 export function shareableURL(state) {
-  const p = new URLSearchParams();
-  p.set("mode", state.mode);
-  p.set("theme", state.theme);
-  p.set("aspect", encodeAspect(state.aspectW, state.aspectH));
-  p.set("density", state.density);
-  p.set("count", String(state.accentCount));
-  if (state.accents && state.accents.length > 0) {
-    p.set("accents", state.accents.join(","));
-  }
-  if (state.seed) p.set("seed", state.seed);
-  if (state.watermark) p.set("wm", "1");
-  return `${window.location.origin}${window.location.pathname}?${p.toString()}`;
+  return `${window.location.origin}${window.location.pathname}?${buildParams(state).toString()}`;
 }
